@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "QutieBot": {
+      "commandName": "Project"
+    },
+    "Container (Dockerfile)": {
+      "commandName": "Docker"
+    }
+  }
+}
