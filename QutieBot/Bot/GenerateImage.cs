@@ -29,16 +29,23 @@ namespace QutieBot.Bot
         {
             _dal = dal;
 
-            // Initialize fonts - trying to use more modern/sleek fonts
-            // Fallback to system default if specific font not available
-            _fontRegular = SKTypeface.FromFamilyName("Poppins", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
-                           ?? SKTypeface.FromFamilyName("Roboto", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+            string fontPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Fonts");
 
-            _fontBold = SKTypeface.FromFamilyName("Poppins", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright)
-                        ?? SKTypeface.FromFamilyName("Roboto", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+            string regularFontPath = Path.Combine(fontPath, "Poppins-Regular.ttf");
+            string boldFontPath = Path.Combine(fontPath, "Poppins-Bold.ttf");
+            string italicFontPath = Path.Combine(fontPath, "Poppins-Italic.ttf");
 
-            _fontItalic = SKTypeface.FromFamilyName("Poppins", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Italic)
-                          ?? SKTypeface.FromFamilyName("Roboto", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Italic);
+            _fontRegular = File.Exists(regularFontPath)
+                ? SKTypeface.FromFile(regularFontPath)
+                : SKTypeface.FromFamilyName("Arial");
+
+            _fontBold = File.Exists(boldFontPath)
+                ? SKTypeface.FromFile(boldFontPath)
+                : SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+
+            _fontItalic = File.Exists(italicFontPath)
+                ? SKTypeface.FromFile(italicFontPath)
+                : SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Italic);
         }
 
         public async Task<byte[]> GenerateUserImage(long userId)
