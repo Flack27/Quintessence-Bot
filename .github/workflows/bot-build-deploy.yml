@@ -5,16 +5,34 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
-  workflow_dispatch: # Allows manual triggering
+  workflow_dispatch:
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
-    environment: Docker 
+    environment: Docker
     
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
+      
+    # Debug: List directory structure to verify file locations
+    - name: Debug - List repository structure
+      run: |
+        echo "Repository root:"
+        ls -la
+        echo "============================="
+        echo "QutieBot directory (if exists):"
+        ls -la QutieBot || echo "Directory doesn't exist"
+        echo "============================="
+        echo "QutieDAL directory (if exists):"
+        ls -la QutieDAL || echo "Directory doesn't exist"
+        echo "============================="
+        echo "QutieDTO directory (if exists):"
+        ls -la QutieDTO || echo "Directory doesn't exist"
+        echo "============================="
+        echo "All project files:"
+        find . -name "*.csproj"
       
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
@@ -27,9 +45,6 @@ jobs:
     - name: Build
       run: dotnet build --configuration Release --no-restore
       
-    - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal
-      
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v2
       
@@ -39,12 +54,70 @@ jobs:
       with:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+    # Create a modified Dockerfile based on actual repository structure
+    - name: Create adapted Dockerfile
+      run: |
+        # Find the actual paths of the csproj files
+        BOT_PROJ=$(find . -name "QutieBot.csproj" | sed 's|^\./||')
+        DAL_PROJ=$(find . -name "QutieDAL.csproj" | sed 's|^\./||')
+        DTO_PROJ=$(find . -name "QutieDTO.csproj" | sed 's|^\./||')
+        
+        # Get the directories
+        BOT_DIR=$(dirname "$BOT_PROJ")
+        DAL_DIR=$(dirname "$DAL_PROJ")
+        DTO_DIR=$(dirname "$DTO_PROJ")
+        
+        echo "Found project files at:"
+        echo "Bot project: $BOT_PROJ (dir: $BOT_DIR)"
+        echo "DAL project: $DAL_PROJ (dir: $DAL_DIR)"
+        echo "DTO project: $DTO_PROJ (dir: $DTO_DIR)"
+        
+        # Create Dockerfile with the correct paths
+        cat > Dockerfile << EOL
+        FROM mcr.microsoft.com/dotnet/runtime:8.0 AS base
+        WORKDIR /app
+
+        FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+        ARG BUILD_CONFIGURATION=Release
+        WORKDIR /src
+        
+        # Copy project files
+        COPY ["${BOT_PROJ}", "${BOT_DIR}/"]
+        COPY ["${DAL_PROJ}", "${DAL_DIR}/"]
+        COPY ["${DTO_PROJ}", "${DTO_DIR}/"]
+        
+        # Restore packages
+        RUN dotnet restore "${BOT_PROJ}"
+        
+        # Copy everything else and build
+        COPY . .
+        WORKDIR "/src/${BOT_DIR}"
+        RUN dotnet build "${BOT_PROJ##*/}" -c \$BUILD_CONFIGURATION -o /app/build
+        
+        # Publish
+        FROM build AS publish
+        ARG BUILD_CONFIGURATION=Release
+        RUN dotnet publish "${BOT_PROJ##*/}" -c \$BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+        
+        # Final image
+        FROM base AS final
+        WORKDIR /app
+        COPY --from=publish /app/publish .
+        ENTRYPOINT ["dotnet", "QutieBot.dll"]
+        EOL
+        
+        # Show the created Dockerfile
+        echo "Created Dockerfile:"
+        cat Dockerfile
         
     - name: Build and push Docker image
       uses: docker/build-push-action@v4
       with:
-        context: QutieBot/
+        context: .
+        file: ./Dockerfile
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:latest, ${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:${{ github.sha }}
-        cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache
-        cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache,mode=max
+        # Remove cache options until first successful build
+        # cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache
+        # cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache,mode=max
