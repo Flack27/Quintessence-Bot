@@ -44,6 +44,10 @@
     <PackageReference Include="System.Linq.Async" Version="6.0.1" />
   </ItemGroup>
 
+	<ItemGroup>
+		<EmbeddedResource Include="Fonts\*.ttf" />
+	</ItemGroup>
+	
   <ItemGroup>
     <ProjectReference Include="..\QutieDAL\QutieDAL.csproj" />
     <ProjectReference Include="..\QutieDTO\QutieDTO.csproj" />
@@ -56,17 +60,7 @@
 		<None Update="account_secret.json">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
-		<None Update="Bot\Fonts\Poppins-Bold.ttf">
-		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
-		<None Update="Bot\Fonts\Poppins-Italic.ttf">
-		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
-		<None Update="Bot\Fonts\Poppins-Regular.ttf">
-		  <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-		</None>
 	</ItemGroup>
-
 	<ItemGroup>
 	  <Folder Include="Properties\" />
 	</ItemGroup>
