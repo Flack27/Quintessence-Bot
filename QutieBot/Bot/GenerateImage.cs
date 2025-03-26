@@ -32,77 +32,80 @@ namespace QutieBot.Bot
             string namespacePrefix = typeof(GenerateImage).Namespace;
 
             var resourceNames = assembly.GetManifestResourceNames();
-            Console.WriteLine("Available embedded resources:");
-            foreach (var resource in resourceNames)
-            {
-                Console.WriteLine($" - {resource}");
-            }
 
-            _fontRegular = LoadFontFromResource(assembly, $"{namespacePrefix}.Fonts.Poppins-Regular.ttf");
-            _fontBold = LoadFontFromResource(assembly, $"{namespacePrefix}.Fonts.Poppins-Bold.ttf");
-            _fontItalic = LoadFontFromResource(assembly, $"{namespacePrefix}.Fonts.Poppins-Italic.ttf");
+            _fontRegular = LoadFontFromResource(assembly, "Poppins-Regular.ttf", SKFontStyleWeight.Normal, SKFontStyleSlant.Upright);
+            _fontBold = LoadFontFromResource(assembly, "Poppins-Bold.ttf", SKFontStyleWeight.Bold, SKFontStyleSlant.Upright);
+            _fontItalic = LoadFontFromResource(assembly, "Poppins-Italic.ttf", SKFontStyleWeight.Normal, SKFontStyleSlant.Italic);
         }
 
-        private SKTypeface LoadFontFromResource(System.Reflection.Assembly assembly, string resourceName)
+        private SKTypeface LoadFontFromResource(System.Reflection.Assembly assembly, string fontFileName, SKFontStyleWeight weight, SKFontStyleSlant slant)
         {
-            Console.WriteLine($"Attempting to load font from resource: {resourceName}");
+            Console.WriteLine($"Loading font: {fontFileName}");
 
             try
             {
-                // Try to find the exact resource name if the provided name doesn't match
-                if (!assembly.GetManifestResourceNames().Contains(resourceName))
-                {
-                    // Look for partial matches (helpful when namespace differs slightly)
-                    var fontFileName = resourceName.Split('.').Last();
-                    var potentialMatch = assembly.GetManifestResourceNames()
-                        .FirstOrDefault(r => r.EndsWith(fontFileName));
+                // Find the resource containing this font file name
+                var resourceName = assembly.GetManifestResourceNames()
+                    .FirstOrDefault(r => r.EndsWith(fontFileName));
 
-                    if (potentialMatch != null)
-                    {
-                        resourceName = potentialMatch;
-                        Console.WriteLine($"Found matching resource: {resourceName}");
-                    }
-                    else
-                    {
-                        Console.WriteLine($"No matching resource found for {fontFileName}");
-                        return SKTypeface.Default;
-                    }
+                if (resourceName == null)
+                {
+                    Console.WriteLine($"No resource found for {fontFileName}");
+                    return GetFallbackFont(weight, slant);
                 }
+
+                Console.WriteLine($"Found resource: {resourceName}");
 
                 using (var stream = assembly.GetManifestResourceStream(resourceName))
                 {
                     if (stream == null)
                     {
                         Console.WriteLine("Stream is null!");
-                        return SKTypeface.Default;
+                        return GetFallbackFont(weight, slant);
                     }
 
-                    // Read the font data into a memory stream
                     using (var memStream = new MemoryStream())
                     {
                         stream.CopyTo(memStream);
                         memStream.Seek(0, SeekOrigin.Begin);
 
-                        // Load the typeface from the stream data
+                        // Create typeface with explicit style
                         var data = SKData.Create(memStream);
                         var typeface = SKTypeface.FromData(data);
 
                         if (typeface == null)
                         {
-                            Console.WriteLine("Failed to create typeface from data");
-                            return SKTypeface.Default;
+                            Console.WriteLine("Failed to create typeface");
+                            return GetFallbackFont(weight, slant);
                         }
 
-                        Console.WriteLine($"Successfully loaded font: {typeface.FamilyName}");
-                        return typeface;
+                        // Create a new typeface with the proper style explicitly set
+                        var style = new SKFontStyle(weight, SKFontStyleWidth.Normal, slant);
+                        var styledTypeface = SKTypeface.FromFamilyName(typeface.FamilyName, style);
+
+                        // If we couldn't create a styled version, use the original
+                        if (styledTypeface == null || styledTypeface.FamilyName != typeface.FamilyName)
+                        {
+                            Console.WriteLine($"Using original typeface: {typeface.FamilyName}");
+                            return typeface;
+                        }
+
+                        Console.WriteLine($"Successfully loaded styled font: {styledTypeface.FamilyName}");
+                        return styledTypeface;
                     }
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error loading font: {ex.Message}");
-                return SKTypeface.Default;
+                return GetFallbackFont(weight, slant);
             }
+        }
+
+        private SKTypeface GetFallbackFont(SKFontStyleWeight weight, SKFontStyleSlant slant)
+        {
+            var style = new SKFontStyle(weight, SKFontStyleWidth.Normal, slant);
+            return SKTypeface.FromFamilyName("Arial", style) ?? SKTypeface.Default;
         }
 
         public async Task<byte[]> GenerateUserImage(long userId)
