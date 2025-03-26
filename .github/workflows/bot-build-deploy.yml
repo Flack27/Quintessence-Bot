@@ -118,6 +118,5 @@ jobs:
         file: ./Dockerfile
         push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:latest, ${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:${{ github.sha }}
-        # Remove cache options until first successful build
-        # cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache
-        # cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache,mode=max
+        cache-from: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache
+        cache-to: type=registry,ref=${{ secrets.DOCKERHUB_USERNAME }}/qutie-bot:buildcache,mode=max
