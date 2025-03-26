@@ -18,7 +18,6 @@ namespace QutieBot.Bot
         private readonly SKColor _secondaryPink = SKColor.Parse("#eb2f8a");  // Vibrant pink from buttons
         private readonly SKColor _backbarColor = SKColor.Parse("#2B0B4A");   // Darker purple for bars
 
-        // Gradients will be created as needed
 
         // Fonts - using the same font family but with different weights/styles
         private readonly SKTypeface _fontRegular;
@@ -29,23 +28,81 @@ namespace QutieBot.Bot
         {
             _dal = dal;
 
-            string fontPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Fonts");
+            var assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            string namespacePrefix = typeof(GenerateImage).Namespace;
 
-            string regularFontPath = Path.Combine(fontPath, "Poppins-Regular.ttf");
-            string boldFontPath = Path.Combine(fontPath, "Poppins-Bold.ttf");
-            string italicFontPath = Path.Combine(fontPath, "Poppins-Italic.ttf");
+            var resourceNames = assembly.GetManifestResourceNames();
+            Console.WriteLine("Available embedded resources:");
+            foreach (var resource in resourceNames)
+            {
+                Console.WriteLine($" - {resource}");
+            }
 
-            _fontRegular = File.Exists(regularFontPath)
-                ? SKTypeface.FromFile(regularFontPath)
-                : SKTypeface.FromFamilyName("Arial");
+            _fontRegular = LoadFontFromResource(assembly, $"{namespacePrefix}.Fonts.Poppins-Regular.ttf");
+            _fontBold = LoadFontFromResource(assembly, $"{namespacePrefix}.Fonts.Poppins-Bold.ttf");
+            _fontItalic = LoadFontFromResource(assembly, $"{namespacePrefix}.Fonts.Poppins-Italic.ttf");
+        }
 
-            _fontBold = File.Exists(boldFontPath)
-                ? SKTypeface.FromFile(boldFontPath)
-                : SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Bold, SKFontStyleWidth.Normal, SKFontStyleSlant.Upright);
+        private SKTypeface LoadFontFromResource(System.Reflection.Assembly assembly, string resourceName)
+        {
+            Console.WriteLine($"Attempting to load font from resource: {resourceName}");
 
-            _fontItalic = File.Exists(italicFontPath)
-                ? SKTypeface.FromFile(italicFontPath)
-                : SKTypeface.FromFamilyName("Arial", SKFontStyleWeight.Normal, SKFontStyleWidth.Normal, SKFontStyleSlant.Italic);
+            try
+            {
+                // Try to find the exact resource name if the provided name doesn't match
+                if (!assembly.GetManifestResourceNames().Contains(resourceName))
+                {
+                    // Look for partial matches (helpful when namespace differs slightly)
+                    var fontFileName = resourceName.Split('.').Last();
+                    var potentialMatch = assembly.GetManifestResourceNames()
+                        .FirstOrDefault(r => r.EndsWith(fontFileName));
+
+                    if (potentialMatch != null)
+                    {
+                        resourceName = potentialMatch;
+                        Console.WriteLine($"Found matching resource: {resourceName}");
+                    }
+                    else
+                    {
+                        Console.WriteLine($"No matching resource found for {fontFileName}");
+                        return SKTypeface.Default;
+                    }
+                }
+
+                using (var stream = assembly.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null)
+                    {
+                        Console.WriteLine("Stream is null!");
+                        return SKTypeface.Default;
+                    }
+
+                    // Read the font data into a memory stream
+                    using (var memStream = new MemoryStream())
+                    {
+                        stream.CopyTo(memStream);
+                        memStream.Seek(0, SeekOrigin.Begin);
+
+                        // Load the typeface from the stream data
+                        var data = SKData.Create(memStream);
+                        var typeface = SKTypeface.FromData(data);
+
+                        if (typeface == null)
+                        {
+                            Console.WriteLine("Failed to create typeface from data");
+                            return SKTypeface.Default;
+                        }
+
+                        Console.WriteLine($"Successfully loaded font: {typeface.FamilyName}");
+                        return typeface;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading font: {ex.Message}");
+                return SKTypeface.Default;
+            }
         }
 
         public async Task<byte[]> GenerateUserImage(long userId)
