@@ -447,21 +447,8 @@ namespace QutieBot.Bot.Commands
                     }
                 }
 
-                // Check if user is guarding someone
-                KeyValuePair<ulong, ProtectionInfo>? guardInfo = _protections
-                    .FirstOrDefault(p => p.Value.Protector.Id == ctx.User.Id);
-
-                if (guardInfo.HasValue && guardInfo.Value.Value.EndTime > DateTime.UtcNow)
-                {
-                    TimeSpan guardRemaining = guardInfo.Value.Value.EndTime - DateTime.UtcNow;
-                    builder.AddField("Currently Guarding",
-                        $"**{guardInfo.Value.Value.Protector.Username}** for **{guardRemaining.Hours}h {guardRemaining.Minutes}m** more",
-                        false);
-                }
-
                 // Add summary if no cooldowns
-                if (!actionRemaining.HasValue && !specialRemaining.HasValue &&
-                    !bankRemaining.HasValue && !guardInfo.HasValue)
+                if (!actionRemaining.HasValue && !specialRemaining.HasValue && !bankRemaining.HasValue)
                 {
                     builder.WithDescription("You have no active cooldowns! All commands are available.");
                 }
