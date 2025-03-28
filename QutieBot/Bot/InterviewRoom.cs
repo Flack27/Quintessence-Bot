@@ -199,16 +199,13 @@ namespace QutieBot.Bot
                     .WithDescription($"Thank you for your interest in joining our community, {user.Mention}!")
                     .WithColor(DiscordColor.Blurple)
                     .AddField("Next Steps",
-                        "Feel free to ask any questions you may have about our community or your application. " +
-                        $"An {adminRole.Mention} will review your submission and be with you shortly.")
-                    .AddField("Note",
-                        "This is a private channel that only you and our admin team can see. " +
-                        "Please be patient - we'll respond as soon as possible.")
+                        "We hope you've taken the time to review and meet our [requirements](https://quintessence-eu.com/requirements). " +
+                        "If you have any questions about our community or your application, please feel free to ask here. " +
+                        $"One of our {adminRole.Mention} team members will review your submission and get back to you shortly.")
                     .WithFooter("Quintessence Application System")
                     .WithTimestamp(DateTimeOffset.UtcNow);
 
                 var contentMessage = $"{adminRole.Mention} {user.Mention}";
-
                 var messageBuilder = new DiscordMessageBuilder()
                     .WithContent(contentMessage)
                     .AddEmbed(welcomeEmbed)
@@ -216,7 +213,6 @@ namespace QutieBot.Bot
                     .WithAllowedMentions(Mentions.All);
 
                 await channel.SendMessageAsync(messageBuilder);
-
                 _logger.LogInformation($"Sent welcome message to channel {channel.Id}");
             }
             catch (Exception ex)
