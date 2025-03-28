@@ -17,7 +17,7 @@ namespace QutieBot
         private readonly HttpListener _httpListener;
         private readonly InterviewRoom _interviewRoom;
         private readonly ILogger<Webhook> _logger;
-        private readonly string _webhookUrl = "http://localhost:5000/webhook/";
+        private readonly string _webhookUrl = "http://+:5000/webhook/";
 
         /// <summary>
         /// Initializes a new instance of the Webhook class
