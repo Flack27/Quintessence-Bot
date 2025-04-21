@@ -107,7 +107,9 @@ namespace QutieBot.Bot
             // Update karma if needed
             if (userMessageXP.Karma < 1)
             {
-                double karmaIncrease = xpEarned * 0.0001 * Math.Pow(userMessageXP.Karma, 2);
+                double baseKarmaIncrease = xpEarned * 0.0001;
+                double karmaFactor = 0.1 + (0.9 * userMessageXP.Karma);
+                double karmaIncrease = baseKarmaIncrease * karmaFactor;
                 userMessageXP.Karma += karmaIncrease;
 
                 if (userMessageXP.Karma > 1)
