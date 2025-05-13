@@ -577,5 +577,56 @@ namespace QutieDAL.DAL
                 return new List<ReactionRoles>();
             }
         }
+
+        /// <summary>
+        /// Updates the form submission to rejected and adds a note to user's description
+        /// </summary>
+        public async Task UpdateDatabaseForUserLeft(ulong userId, long submissionId)
+        {
+            try
+            {
+                _logger.LogInformation($"Updating database for user {userId} who left with submission {submissionId}");
+
+                // Update FormSubmission to set Approved = false
+                using var context = _contextFactory.CreateDbContext();
+
+                var submission = await context.FormSubmissions.FirstOrDefaultAsync(fs => fs.SubmissionId == submissionId);
+
+                if (submission != null)
+                {
+                    submission.Approved = false;
+                    _logger.LogInformation($"Set submission {submissionId} to rejected (Approved = false)");
+                }
+
+                // Update user's description
+                var user = await context.Users
+                    .FirstOrDefaultAsync(u => u.UserId == (long)userId);
+
+                if (user != null)
+                {
+                    // Add timestamp message to description
+                    var timestamp = DateTimeOffset.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+                    var leftMessage = $"[{timestamp} UTC] Applied but left server before interview completion";
+
+                    if (string.IsNullOrWhiteSpace(user.Description))
+                    {
+                        user.Description = leftMessage;
+                    }
+                    else
+                    {
+                        user.Description += $"\n{leftMessage}";
+                    }
+
+                    _logger.LogInformation($"Updated user {userId} description with left server note");
+                }
+
+                await context.SaveChangesAsync();
+                _logger.LogInformation($"Database updates completed for user {userId}");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating database for user {userId} who left");
+            }
+        }
     }
 }

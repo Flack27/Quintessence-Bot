@@ -2,6 +2,7 @@
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Microsoft.Extensions.Logging;
+using QutieDAL.DAL;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +22,7 @@ namespace QutieBot.Bot
         // Dependencies
         private readonly DiscordClient _client;
         private readonly ILogger<InterviewRoom> _logger;
+        private readonly DiscordInfoSaverDAL _discordInfoSaverDAL;
 
         // Active interview tracking
         private readonly Dictionary<ulong, InterviewData> _activeInterviews = new Dictionary<ulong, InterviewData>();
@@ -31,6 +33,7 @@ namespace QutieBot.Bot
         public InterviewRoom(
             DiscordClient client,
             ILogger<InterviewRoom> logger,
+            DiscordInfoSaverDAL discordInfoSaverDAL,
             ulong categoryId = 1308761605105909790,
             ulong adminRoleId = 1152617541190041600)
         {
@@ -38,6 +41,7 @@ namespace QutieBot.Bot
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _categoryId = categoryId;
             _adminRoleId = adminRoleId;
+            _discordInfoSaverDAL = discordInfoSaverDAL;
 
             _logger.LogInformation($"InterviewRoom initialized with category {_categoryId} and admin role {_adminRoleId}");
         }
@@ -234,7 +238,10 @@ namespace QutieBot.Bot
                 if (_activeInterviews.TryGetValue(userId, out var interviewData))
                 {
                     var channelId = interviewData.ChannelId;
+                    var submissionId = interviewData.SubmissionId;
                     _logger.LogInformation($"User {userId} left with active interview room {channelId}");
+
+                    await _discordInfoSaverDAL.UpdateDatabaseForUserLeft(userId, submissionId);
 
                     // Get the channel
                     DiscordChannel channel;
