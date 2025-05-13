@@ -25,6 +25,8 @@ public partial class QutieDataTestContext : DbContext
 
     public virtual DbSet<ReactionRoles> ReactionRoles { get; set; }
 
+    public virtual DbSet<FormSubmission> FormSubmissions { get; set; }
+
     public virtual DbSet<Channel> Channels { get; set; }
 
     public virtual DbSet<Event> Events { get; set; }
@@ -124,6 +126,11 @@ public partial class QutieDataTestContext : DbContext
         modelBuilder.Entity<ReactionRoles>(entity =>
         {
             entity.HasKey(e => e.Id);
+        });
+
+        modelBuilder.Entity<FormSubmission>(entity =>
+        {
+            entity.HasKey(e => e.SubmissionId);
         });
 
         modelBuilder.Entity<Channel>(entity =>
