@@ -54,7 +54,7 @@ namespace QutieBot.Bot.GoogleSheets
                     if (requests.Count > 0)
                     {
                         var batchUpdateRequest = new BatchUpdateSpreadsheetRequest { Requests = requests };
-                        await _service.Spreadsheets.BatchUpdate(batchUpdateRequest, channel.Game.SheetId).ExecuteAsync();
+                        await ExecuteBatchUpdateAsync(channel.Game.SheetId, batchUpdateRequest);
                     }
 
                     _logger.LogInformation($"Successfully populated event {evt.EventId}: {evt.Title}");
