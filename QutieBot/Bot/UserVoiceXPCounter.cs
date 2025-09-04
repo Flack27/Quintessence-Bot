@@ -99,13 +99,13 @@ namespace QutieBot.Bot
                     return;
                 }
 
-                if (_voiceActivityStartTimes.TryAdd(e.User.Id, DateTime.Now))
+                if (_voiceActivityStartTimes.TryAdd(e.User.Id, DateTime.UtcNow))
                 {
                     _logger.LogInformation($"User {e.User.Username} ({e.User.Id}) joined voice channel {e.After.Channel.Name} - tracking started");
                 }
                 else
                 {
-                    _voiceActivityStartTimes[e.User.Id] = DateTime.Now;
+                    _voiceActivityStartTimes[e.User.Id] = DateTime.UtcNow;
                     _logger.LogDebug($"Updated existing voice tracking for user {e.User.Username} ({e.User.Id})");
                 }
             }
@@ -134,7 +134,7 @@ namespace QutieBot.Bot
                     _logger.LogInformation($"User {e.User.Username} ({e.User.Id}) left voice channel {e.Before.Channel.Name}");
 
                     UserData userVoiceXP = await _databaseManager.GetUserVoiceXP(e.User.Id);
-                    var timeElapsed = DateTime.Now - startTime;
+                    var timeElapsed = DateTime.UtcNow - startTime;
 
                     // Skip if time spent was too short (less than 1 minute)
                     if (timeElapsed.TotalMinutes < 1)
@@ -169,12 +169,17 @@ namespace QutieBot.Bot
                     return;
                 }
 
-                DateTime startTime = _voiceActivityStartTimes.GetOrAdd(e.User.Id, DateTime.Now);
-
-                if ((DateTime.Now - startTime).TotalMilliseconds < 100) // If timestamp is very recent (new addition)
+                if (_voiceActivityStartTimes.TryGetValue(e.User.Id, out DateTime startTime))
                 {
-                    _logger.LogDebug($"User {e.User.Username} ({e.User.Id}) switched to voice channel {e.After.Channel.Name} - tracking started");
+                    var timeElapsed = DateTime.UtcNow - startTime;
+                    if (timeElapsed.TotalMinutes >= 1)
+                    {
+                        // Award XP for time in previous channel
+                        await ProcessVoiceXPEarning(e, await _databaseManager.GetUserVoiceXP(e.User.Id), timeElapsed);
+                    }
                 }
+
+                _voiceActivityStartTimes[e.User.Id] = DateTime.UtcNow;
             }
             catch (Exception ex)
             {
