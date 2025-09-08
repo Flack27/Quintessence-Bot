@@ -203,7 +203,7 @@ namespace QutieBot.Bot
                     .WithDescription($"Thank you for your interest in joining our community, {user.Mention}!")
                     .WithColor(DiscordColor.Blurple)
                     .AddField("Next Steps",
-                        "We hope you've taken the time to review and meet our [requirements](https://quintessence-eu.com/requirements). " +
+                        "We hope you've taken the time to review and meet our [requirements](https://quintessence-eu.com/#requirements). " +
                         "If you have any questions about our community or your application, please feel free to ask here. " +
                         $"One of our {adminRole.Mention} team members will review your submission and get back to you shortly.")
                     .WithFooter("Quintessence Application System")
