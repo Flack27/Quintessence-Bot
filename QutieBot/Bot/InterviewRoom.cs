@@ -124,13 +124,38 @@ namespace QutieBot.Bot
 
                     // Allow the applicant access
                     new DiscordOverwriteBuilder(user)
-                        .Allow(DiscordPermissions.AccessChannels | DiscordPermissions.SendMessages |
-                               DiscordPermissions.ReadMessageHistory | DiscordPermissions.AddReactions),
+                        .Allow(DiscordPermissions.AccessChannels |
+                               DiscordPermissions.SendMessages |
+                               DiscordPermissions.ReadMessageHistory |
+                               DiscordPermissions.AddReactions |
+                               DiscordPermissions.UseExternalEmojis |
+                               DiscordPermissions.UseExternalStickers |
+                               DiscordPermissions.EmbedLinks |
+                               DiscordPermissions.AttachFiles |
+                               DiscordPermissions.UseApplicationCommands |
+                               DiscordPermissions.SendMessagesInThreads |
+                               DiscordPermissions.CreatePublicThreads |
+                               DiscordPermissions.CreatePrivateThreads),
 
                     // Give admins full access
                     new DiscordOverwriteBuilder(adminRole)
-                        .Allow(DiscordPermissions.AccessChannels | DiscordPermissions.ManageChannels |
-                               DiscordPermissions.SendMessages | DiscordPermissions.ReadMessageHistory)
+                        .Allow(DiscordPermissions.AccessChannels |
+                               DiscordPermissions.ManageChannels |
+                               DiscordPermissions.SendMessages |
+                               DiscordPermissions.ReadMessageHistory |
+                               DiscordPermissions.AddReactions |
+                               DiscordPermissions.UseExternalEmojis |
+                               DiscordPermissions.UseExternalStickers |
+                               DiscordPermissions.EmbedLinks |
+                               DiscordPermissions.AttachFiles |
+                               DiscordPermissions.UseApplicationCommands |
+                               DiscordPermissions.SendMessagesInThreads |
+                               DiscordPermissions.CreatePublicThreads |
+                               DiscordPermissions.CreatePrivateThreads |
+                               DiscordPermissions.ManageThreads |
+                               DiscordPermissions.ManageMessages |
+                               DiscordPermissions.MentionEveryone |
+                               DiscordPermissions.ManageRoles)
                 };
 
                 // Create the channel
