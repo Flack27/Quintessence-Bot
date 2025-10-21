@@ -54,6 +54,9 @@ public partial class QutieDataTestContext : DbContext
 
     public virtual DbSet<AocData> AocData { get; set; }
 
+    public virtual DbSet<WwmData> WwmData { get; set; }
+    public virtual DbSet<AionData> AionData { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
 
@@ -63,7 +66,15 @@ public partial class QutieDataTestContext : DbContext
             entity.HasKey(e => e.UserId);
         });
 
+        modelBuilder.Entity<WwmData>(entity =>
+        {
+            entity.HasKey(e => e.UserId);
+        });
 
+        modelBuilder.Entity<AionData>(entity =>
+        {
+            entity.HasKey(e => e.UserId);
+        });
 
 
 

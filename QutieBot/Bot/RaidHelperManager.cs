@@ -70,7 +70,7 @@ namespace QutieBot.Bot
                         return;
                     }
 
-                    var eventList = events
+                    var eventList = futureEvents
                         .Select(eventData => new Event
                         {
                             EventId = (long)eventData.id,

@@ -27,7 +27,10 @@ namespace QutieDAL.DAL
             {
                 case 4: // Ashes of Creation
                     return await context.AocData.FirstOrDefaultAsync(d => d.UserId == userId);
-                // Add cases for new games here
+                case 7: // WWM
+                    return await context.WwmData.FirstOrDefaultAsync(d => d.UserId == userId);
+                case 8: // AION
+                    return await context.AionData.FirstOrDefaultAsync(d => d.UserId == userId);
                 default:
                     _logger.LogWarning($"No data mapping configured for game ID {gameId}");
                     return null;
