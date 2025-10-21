@@ -83,17 +83,21 @@ namespace QutieBot.Bot.Commands.Games
 
             var embed = new DiscordEmbedBuilder
             {
-                Title = $"{ctx.User.GlobalName}'s Character Profile",
+                Title = $"{ctx.User.GlobalName}'s AION Profile",
                 Color = DiscordColor.Gold,
                 Thumbnail = new DiscordEmbedBuilder.EmbedThumbnail { Url = ctx.User.AvatarUrl },
                 Timestamp = System.DateTime.UtcNow
             };
 
-            embed.AddField("Character Name", gameData.IGN ?? "Not set", true)
-                 .AddField("Gearscore", gameData.Gearscore?.ToString() ?? "Not set", true)
-                 .AddField("Roster", roster?.Name ?? "None", true)
-                 .AddField("Class", gameData.Class ?? "Not set", true)
-                 .AddField("Role", gameData.Role ?? "Not set", true);
+            var description = new StringBuilder();
+            description.AppendLine($"**Character:** {gameData.IGN ?? "Not set"}");
+            description.AppendLine($"**Gearscore:** {gameData.Gearscore?.ToString() ?? "Not set"}");
+            description.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
+            description.AppendLine();
+            description.AppendLine($"**Class:** {gameData.Class ?? "Not set"}");
+            description.AppendLine($"**Role:** {gameData.Role ?? "Not set"}");
+
+            embed.WithDescription(description.ToString());
 
             await ctx.RespondAsync(embed);
         }
@@ -133,15 +137,34 @@ namespace QutieBot.Bot.Commands.Games
                 await _sheets.UpdateUserAsync((long)ctx.User.Id, game);
             }
 
-            var messageBuilder = new StringBuilder();
-            messageBuilder.AppendLine("✅ Character updated successfully!");
-            messageBuilder.AppendLine($"• Name: {name}");
-            messageBuilder.AppendLine($"• Gearscore: {gearscore}");
-            messageBuilder.AppendLine($"• Class: {@class}");
-            messageBuilder.AppendLine($"• Role: {role}");
-            messageBuilder.AppendLine("\nUse `/aion profile` to view your complete profile.");
+            // Get roster info for the success message
+            var rosterIds = await _dal.GetRoster(GameId);
+            DiscordRole? roster = null;
+            if (rosterIds != null)
+            {
+                roster = ctx.Member?.Roles.FirstOrDefault(r => rosterIds.Contains((long)r.Id));
+            }
 
-            await ctx.RespondAsync(messageBuilder.ToString());
+            var embed = new DiscordEmbedBuilder
+            {
+                Title = $"{ctx.User.GlobalName}'s AION Profile",
+                Description = "✅ Character updated successfully!",
+                Color = DiscordColor.Green,
+                Thumbnail = new DiscordEmbedBuilder.EmbedThumbnail { Url = ctx.User.AvatarUrl },
+                Timestamp = System.DateTime.UtcNow
+            };
+
+            var details = new StringBuilder();
+            details.AppendLine($"**Character:** {name}");
+            details.AppendLine($"**Gearscore:** {gearscore}");
+            details.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
+            details.AppendLine();
+            details.AppendLine($"**Class:** {@class}");
+            details.AppendLine($"**Role:** {role}");
+
+            embed.AddField("Profile Details", details.ToString());
+
+            await ctx.RespondAsync(embed);
         }
 
         // Choice providers
