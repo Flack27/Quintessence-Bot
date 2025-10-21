@@ -123,7 +123,7 @@ namespace QutieBot.Bot.Commands
                     services.AddInteractivityExtension(new InteractivityConfiguration { Timeout = TimeSpan.FromMinutes(2) });
                     services.AddCommandsExtension(services =>
                     {
-                        services.AddCommands(new[] { typeof(AdminCommands), typeof(AocCommands), typeof(UserCommands) });
+                        services.AddCommands(new[] { typeof(AdminCommands), typeof(AocCommands), typeof(UserCommands), typeof(WwmCommands), typeof(AionCommands) });
                         services.AddProcessors(new SlashCommandProcessor());
                     });
 
@@ -156,8 +156,11 @@ namespace QutieBot.Bot.Commands
             services.AddSingleton<GoogleSheetsDAL>();
             services.AddSingleton<UserSheetDAL>();
             services.AddSingleton<CommandsDAL>();
-            services.AddSingleton<AocCommandsDAL>();
             services.AddSingleton<AutomatedCheckDAL>();
+
+            services.AddSingleton<AocCommandsDAL>();
+            services.AddScoped<WwmCommandsDAL>();
+            services.AddSingleton<AionCommandsDAL>();
         }
 
         /// <summary>
@@ -193,6 +196,8 @@ namespace QutieBot.Bot.Commands
             services.AddSingleton<UserCommands>();
             services.AddSingleton<AdminCommands>();
             services.AddSingleton<AocCommands>();
+            services.AddSingleton<WwmCommands>();
+            services.AddSingleton<AionCommands>();
 
             // Webhook service
             services.AddSingleton<Webhook>();

@@ -934,7 +934,7 @@ namespace QutieBot.Bot.Commands
                     double percentageSignedUp = usersSignedUpCount / channelUsers.Count * 100;
                     string percentageString = $"{(int)Math.Round(percentageSignedUp)}%";
 
-                    // Format user list
+                    // Format user list with dynamic field splitting
                     var unsignedUserNames = usersNotSignedUp.Select(user => user.DisplayName).ToList();
 
                     // Build response
@@ -942,19 +942,41 @@ namespace QutieBot.Bot.Commands
                         .WithTitle($"Signup Status for {eventChannel.Name}")
                         .WithDescription($"{usersNotSignedUp.Count} users haven't signed up for the event.")
                         .AddField("Progress", $"{percentageString} of users have signed up ({usersSignedUpCount}/{channelUsers.Count})", false)
-                        .AddField("Users Missing Signups", string.Join("\n", unsignedUserNames.Take(25)), false)
                         .WithColor(DiscordColor.Yellow)
                         .WithTimestamp(DateTime.Now);
 
-                    // Add overflow field if needed
-                    if (unsignedUserNames.Count > 25)
-                    {
-                        embed.AddField("More Users", string.Join("\n", unsignedUserNames.Skip(25).Take(25)), false);
+                    // Add users with dynamic field splitting (1024 char limit per field)
+                    const int maxFieldLength = 1024;
+                    var currentFieldUsers = new List<string>();
+                    int currentLength = 0;
+                    int fieldCount = 0;
 
-                        if (unsignedUserNames.Count > 50)
+                    for (int i = 0; i < unsignedUserNames.Count; i++)
+                    {
+                        string userName = unsignedUserNames[i];
+                        int userLength = userName.Length + 1; // +1 for newline
+
+                        // Check if adding this user would exceed the limit
+                        if (currentLength + userLength > maxFieldLength && currentFieldUsers.Count > 0)
                         {
-                            embed.AddField("Additional Users", $"...and {unsignedUserNames.Count - 50} more", false);
+                            // Add current field and start a new one
+                            string fieldName = fieldCount == 0 ? "Users Missing Signups" : $"More Users ({fieldCount + 1})";
+                            embed.AddField(fieldName, string.Join("\n", currentFieldUsers), false);
+
+                            currentFieldUsers.Clear();
+                            currentLength = 0;
+                            fieldCount++;
                         }
+
+                        currentFieldUsers.Add(userName);
+                        currentLength += userLength;
+                    }
+
+                    // Add remaining users
+                    if (currentFieldUsers.Count > 0)
+                    {
+                        string fieldName = fieldCount == 0 ? "Users Missing Signups" : $"More Users ({fieldCount + 1})";
+                        embed.AddField(fieldName, string.Join("\n", currentFieldUsers), false);
                     }
 
                     await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
