@@ -39,7 +39,7 @@ namespace QutieBot.Bot.Commands.Games
 
             var commandInfo = new StringBuilder();
 
-            commandInfo.AppendLine("**Wuthering Waves Commands:**");
+            commandInfo.AppendLine("**Where Winds Meet Commands:**");
             commandInfo.AppendLine();
 
             commandInfo.AppendLine("**Character Commands:**");
@@ -56,14 +56,14 @@ namespace QutieBot.Bot.Commands.Games
             commandInfo.AppendLine("- `style` - Your gameplay style (Casual, Hardcore, etc.)");
 
             var embed = new DiscordEmbedBuilder()
-                .WithTitle("Wuthering Waves Commands")
+                .WithTitle("Where Winds Meet Commands")
                 .WithDescription(commandInfo.ToString())
                 .WithColor(DiscordColor.Cyan);
 
             await ctx.RespondAsync(embed.Build());
         }
 
-        [Command("profile"), Description("View your Wuthering Waves character profile")]
+        [Command("profile"), Description("View your Where Winds Meet character profile")]
         public async Task GetWwmData(CommandContext ctx)
         {
             _logger.LogInformation($"User {ctx.User.Id} requested their WWM profile");
@@ -86,24 +86,28 @@ namespace QutieBot.Bot.Commands.Games
 
             var embed = new DiscordEmbedBuilder
             {
-                Title = $"{ctx.User.GlobalName}'s Character Profile",
+                Title = $"{ctx.User.GlobalName}'s Where Winds Meet Profile",
                 Color = DiscordColor.Cyan,
                 Thumbnail = new DiscordEmbedBuilder.EmbedThumbnail { Url = ctx.User.AvatarUrl },
                 Timestamp = System.DateTime.UtcNow
             };
 
-            embed.AddField("Character Name", gameData.IGN ?? "Not set", true)
-                 .AddField("Level", gameData.Level?.ToString() ?? "Not set", true)
-                 .AddField("Roster", roster?.Name ?? "None", true)
-                 .AddField("Primary Weapon", gameData.PrimaryWeapon ?? "Not set", true)
-                 .AddField("Secondary Weapon", gameData.SecondaryWeapon ?? "Not set", true)
-                 .AddField("Role", gameData.Role ?? "Not set", true)
-                 .AddField("Playstyle", gameData.Playstyle ?? "Not set", false);
+            var description = new StringBuilder();
+            description.AppendLine($"**Character:** {gameData.IGN ?? "Not set"}");
+            description.AppendLine($"**Level:** {gameData.Level?.ToString() ?? "Not set"}");
+            description.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
+            description.AppendLine();
+            description.AppendLine($"**Primary Weapon:** {gameData.PrimaryWeapon ?? "Not set"}");
+            description.AppendLine($"**Secondary Weapon:** {gameData.SecondaryWeapon ?? "Not set"}");
+            description.AppendLine($"**Role:** {gameData.Role ?? "Not set"}");
+            description.AppendLine($"**Playstyle:** {gameData.Playstyle ?? "Not set"}");
+
+            embed.WithDescription(description.ToString());
 
             await ctx.RespondAsync(embed);
         }
 
-        [Command("char"), Description("Update your Wuthering Waves character details")]
+        [Command("char"), Description("Update your Where Winds Meet character details")]
         public async Task UpdateWwmData(CommandContext ctx,
             [Description("Your character name")] string name,
             [Description("Your character level")] int level,
@@ -142,19 +146,37 @@ namespace QutieBot.Bot.Commands.Games
                 await _sheets.UpdateUserAsync((long)ctx.User.Id, game);
             }
 
-            var messageBuilder = new StringBuilder();
-            messageBuilder.AppendLine("✅ Character updated successfully!");
-            messageBuilder.AppendLine($"• Name: {name}");
-            messageBuilder.AppendLine($"• Level: {level}");
-            messageBuilder.AppendLine($"• Primary Weapon: {primary}");
-            messageBuilder.AppendLine($"• Secondary Weapon: {secondary}");
-            messageBuilder.AppendLine($"• Role: {role}");
-            messageBuilder.AppendLine($"• Playstyle: {style}");
-            messageBuilder.AppendLine("\nUse `/wwm profile` to view your complete profile.");
+            // Get roster info for the success message
+            var rosterIds = await _dal.GetRoster(GameId);
+            DiscordRole? roster = null;
+            if (rosterIds != null)
+            {
+                roster = ctx.Member?.Roles.FirstOrDefault(r => rosterIds.Contains((long)r.Id));
+            }
 
-            await ctx.RespondAsync(messageBuilder.ToString());
+            var embed = new DiscordEmbedBuilder
+            {
+                Title = $"{ctx.User.GlobalName}'s Where Winds Meet Profile",
+                Description = "✅ Character updated successfully!",
+                Color = DiscordColor.Green,
+                Thumbnail = new DiscordEmbedBuilder.EmbedThumbnail { Url = ctx.User.AvatarUrl },
+                Timestamp = System.DateTime.UtcNow
+            };
+
+            var details = new StringBuilder();
+            details.AppendLine($"**Character:** {name}");
+            details.AppendLine($"**Level:** {level}");
+            details.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
+            details.AppendLine();
+            details.AppendLine($"**Primary Weapon:** {primary}");
+            details.AppendLine($"**Secondary Weapon:** {secondary}");
+            details.AppendLine($"**Role:** {role}");
+            details.AppendLine($"**Playstyle:** {style}");
+
+            embed.AddField("Profile Details", details.ToString());
+
+            await ctx.RespondAsync(embed);
         }
-
 
         // Choice providers for weapons
         private class PrimaryWeaponProvider : IChoiceProvider
