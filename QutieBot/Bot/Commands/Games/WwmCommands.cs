@@ -52,7 +52,7 @@ namespace QutieBot.Bot.Commands.Games
             commandInfo.AppendLine("- `level` - Your current character level");
             commandInfo.AppendLine("- `primary` - Your primary weapon");
             commandInfo.AppendLine("- `secondary` - Your secondary weapon");
-            commandInfo.AppendLine("- `role` - Your preferred role (DPS, Support, etc.)");
+            commandInfo.AppendLine("- `role` - Your role (DPS, Support, Healer)");
             commandInfo.AppendLine("- `style` - Your gameplay style (Casual, Hardcore, etc.)");
 
             var embed = new DiscordEmbedBuilder()
@@ -251,9 +251,9 @@ namespace QutieBot.Bot.Commands.Games
                 var choices = new Dictionary<string, object>
                 {
                     { "Casual", "Casual" },
+                    { "Semi-HC", "Semi-HC" },
                     { "Hardcore", "Hardcore" },
-                    { "Competitive", "Competitive" },
-                    { "Social", "Social" }
+                    { "No-Life", "No-Life" },
                 };
 
                 return new ValueTask<IReadOnlyDictionary<string, object>>(choices);

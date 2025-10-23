@@ -62,7 +62,7 @@ namespace QutieBot.Bot.Commands.Games
             commandInfo.AppendLine("- `name` - Your in-game character name");
             commandInfo.AppendLine("- `level` - Your current character level");
             commandInfo.AppendLine("- `class` - Your primary archetype");
-            commandInfo.AppendLine("- `role` - Your combat role (Tank, DPS, etc.)");
+            commandInfo.AppendLine("- `role` - Your combat role (Tank, DPS, Healer)");
             commandInfo.AppendLine("- `style` - Your gameplay style (Casual, Hardcore, etc.)");
             commandInfo.AppendLine();
 
