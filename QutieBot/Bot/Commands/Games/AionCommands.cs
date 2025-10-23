@@ -104,10 +104,10 @@ namespace QutieBot.Bot.Commands.Games
 
         [Command("char"), Description("Update your AION character details")]
         public async Task UpdateAionData(CommandContext ctx,
-            [Description("Your character name")] string name,
-            [Description("Your gearscore")] int gearscore,
-            [Description("Your character class"), SlashChoiceProvider<ClassProvider>] string @class,
-            [Description("Your preferred role"), SlashChoiceProvider<RoleProvider>] string role)
+           [Description("Your character name")] string? name = null,
+           [Description("Your gearscore")] int? gearscore = null,
+           [Description("Your character class"), SlashChoiceProvider<ClassProvider>] string? @class = null,
+           [Description("Your preferred role"), SlashChoiceProvider<RoleProvider>] string? role = null)
         {
             _logger.LogInformation($"User {ctx.User.Id} updating AION character data");
 

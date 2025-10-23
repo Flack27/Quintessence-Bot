@@ -107,14 +107,14 @@ namespace QutieBot.Bot.Commands.Games
             await ctx.RespondAsync(embed);
         }
 
-        [Command("char"), Description("Update your Where Winds Meet character details")]
+        [Command("char"), Description("Update your Wuthering Waves character details")]
         public async Task UpdateWwmData(CommandContext ctx,
-            [Description("Your character name")] string name,
-            [Description("Your character level")] int level,
-            [Description("Your primary weapon"), SlashChoiceProvider<PrimaryWeaponProvider>] string primary,
-            [Description("Your secondary weapon"), SlashChoiceProvider<SecondaryWeaponProvider>] string secondary,
-            [Description("Your preferred role"), SlashChoiceProvider<RoleProvider>] string role,
-            [Description("Your gameplay style"), SlashChoiceProvider<PlaystyleProvider>] string style)
+                    [Description("Your character name")] string? name = null,
+                    [Description("Your character level")] int? level = null,
+                    [Description("Your primary weapon"), SlashChoiceProvider<PrimaryWeaponProvider>] string? primary = null,
+                    [Description("Your secondary weapon"), SlashChoiceProvider<SecondaryWeaponProvider>] string? secondary = null,
+                    [Description("Your preferred role"), SlashChoiceProvider<RoleProvider>] string? role = null,
+                    [Description("Your gameplay style"), SlashChoiceProvider<PlaystyleProvider>] string? style = null)
         {
             _logger.LogInformation($"User {ctx.User.Id} updating WWM character data");
 
@@ -146,6 +146,14 @@ namespace QutieBot.Bot.Commands.Games
                 await _sheets.UpdateUserAsync((long)ctx.User.Id, game);
             }
 
+            // Get the updated data to show in response
+            var updatedData = await _dal.GetWwmDataAsync(ctx.User.Id);
+            if (updatedData == null)
+            {
+                await ctx.RespondAsync("Failed to retrieve updated profile. Please try again.");
+                return;
+            }
+
             // Get roster info for the success message
             var rosterIds = await _dal.GetRoster(GameId);
             DiscordRole? roster = null;
@@ -164,14 +172,14 @@ namespace QutieBot.Bot.Commands.Games
             };
 
             var details = new StringBuilder();
-            details.AppendLine($"**Character:** {name}");
-            details.AppendLine($"**Level:** {level}");
+            details.AppendLine($"**Character:** {updatedData.IGN ?? "Not set"}");
+            details.AppendLine($"**Level:** {updatedData.Level?.ToString() ?? "Not set"}");
             details.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
             details.AppendLine();
-            details.AppendLine($"**Primary Weapon:** {primary}");
-            details.AppendLine($"**Secondary Weapon:** {secondary}");
-            details.AppendLine($"**Role:** {role}");
-            details.AppendLine($"**Playstyle:** {style}");
+            details.AppendLine($"**Primary Weapon:** {updatedData.PrimaryWeapon ?? "Not set"}");
+            details.AppendLine($"**Secondary Weapon:** {updatedData.SecondaryWeapon ?? "Not set"}");
+            details.AppendLine($"**Role:** {updatedData.Role ?? "Not set"}");
+            details.AppendLine($"**Playstyle:** {updatedData.Playstyle ?? "Not set"}");
 
             embed.AddField("Profile Details", details.ToString());
 
