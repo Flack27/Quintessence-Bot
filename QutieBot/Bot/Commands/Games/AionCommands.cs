@@ -50,7 +50,7 @@ namespace QutieBot.Bot.Commands.Games
             commandInfo.AppendLine("- `name` - Your in-game character name");
             commandInfo.AppendLine("- `gearscore` - Your current gearscore");
             commandInfo.AppendLine("- `class` - Your character class");
-            commandInfo.AppendLine("- `role` - Your preferred role (DPS, Tank, Healer, Support)");
+            commandInfo.AppendLine("- `role` - Your role (DPS, Tank, Healer, Support)");
 
             var embed = new DiscordEmbedBuilder()
                 .WithTitle("AION Commands")
@@ -106,8 +106,8 @@ namespace QutieBot.Bot.Commands.Games
         public async Task UpdateAionData(CommandContext ctx,
            [Description("Your character name")] string? name = null,
            [Description("Your gearscore")] int? gearscore = null,
-           [Description("Your character class"), SlashChoiceProvider<ClassProvider>] string? @class = null,
-           [Description("Your preferred role"), SlashChoiceProvider<RoleProvider>] string? role = null)
+           [Description("Your class"), SlashChoiceProvider<ClassProvider>] string? @class = null,
+           [Description("Your role"), SlashChoiceProvider<RoleProvider>] string? role = null)
         {
             _logger.LogInformation($"User {ctx.User.Id} updating AION character data");
 
