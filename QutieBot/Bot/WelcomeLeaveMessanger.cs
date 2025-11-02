@@ -48,7 +48,7 @@ namespace QutieBot.Bot
                 // Create the embed
                 var embed = new DiscordEmbedBuilder()
                     .WithTitle($"Welcome {e.Member.DisplayName}!")
-                    .WithDescription($"We hope you enjoy your stay in Quintessence! Please head to {guildInfoMention} to learn of our principles. You may begin your application for any Quintessence roster by heading to {guildAppMention} & filling out the application form!")
+                    .WithDescription($"We hope you enjoy your stay in Quintessence!\nPlease head to {guildInfoMention} to learn of our principles. You may begin your application for any Quintessence roster by heading to {guildAppMention} & filling out the application form!")
                     .WithColor(DiscordColor.Purple)
                     .WithThumbnail(e.Member.AvatarUrl);
 
