@@ -19,7 +19,6 @@ using Microsoft.Extensions.Logging;
 using DSharpPlus;
 using System.Text.RegularExpressions;
 using System.Threading.Channels;
-using static QutieBot.Bot.Commands.AdminCommands;
 using QutieBot.Bot.Services;
 
 namespace QutieBot.Bot.Commands
@@ -32,6 +31,8 @@ namespace QutieBot.Bot.Commands
         private readonly GoogleSheetsFacade _googleSheetsFacade;
         private readonly AutomatedCheckService _automatedCheckService;
         private readonly CommandsDAL _commandsDAL;
+        private readonly AutoRoleDAL _autoRoleDAL;
+        private readonly AutoRoleCommands _autoRoleCommands;
         private readonly ILogger<AdminCommands> _logger;
 
         private readonly ChannelCommands _channelCommands;
@@ -42,6 +43,7 @@ namespace QutieBot.Bot.Commands
             GoogleSheetsFacade googleSheetsFacade,
             CommandsDAL commandsDAL,
             AutomatedCheckService automatedCheckService,
+            AutoRoleDAL autoRoleDAL,
             ILogger<AdminCommands> logger)
         {
             _joinToCreateChannelBot = joinToCreateChannelBot ?? throw new ArgumentNullException(nameof(joinToCreateChannelBot));
@@ -49,6 +51,8 @@ namespace QutieBot.Bot.Commands
             _googleSheetsFacade = googleSheetsFacade ?? throw new ArgumentNullException(nameof(googleSheetsFacade));
             _automatedCheckService = automatedCheckService ?? throw new ArgumentNullException(nameof(automatedCheckService));
             _commandsDAL = commandsDAL ?? throw new ArgumentNullException(nameof(commandsDAL));
+            _autoRoleDAL = autoRoleDAL ?? throw new ArgumentNullException(nameof(autoRoleDAL));
+            _autoRoleCommands = new AutoRoleCommands(this);
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _channelCommands = new ChannelCommands(this);
@@ -58,6 +62,7 @@ namespace QutieBot.Bot.Commands
         internal CommandsModule CommandsModule => _commandsModule;
         internal GoogleSheetsFacade GoogleSheetsFacade => _googleSheetsFacade;
         internal CommandsDAL CommandsDAL => _commandsDAL;
+        internal AutoRoleDAL AutoRoleDAL => _autoRoleDAL;
         internal ILogger<AdminCommands> Logger => _logger;
 
 
@@ -89,6 +94,13 @@ namespace QutieBot.Bot.Commands
                 commandsList.AppendLine("📊 **Google Sheets Integration**");
                 commandsList.AppendLine("`/admin sheet sync` - Synchronize all users and events with Google Sheets");
                 commandsList.AppendLine("`/admin sheet notify` - Send notifications to users with missing game info");
+                commandsList.AppendLine();
+
+                // Auto-Role Management Commands (add after Event Management section)
+                commandsList.AppendLine("🎭 **Auto-Role Management**");
+                commandsList.AppendLine("`/admin autorole add` - Add a role to auto-assign to new members");
+                commandsList.AppendLine("`/admin autorole remove` - Remove a role from auto-assignment");
+                commandsList.AppendLine("`/admin autorole list` - List all auto-assigned roles");
                 commandsList.AppendLine();
 
                 // Event Management Commands
@@ -1697,6 +1709,189 @@ namespace QutieBot.Bot.Commands
                 {
                     _parent._logger.LogError(ex, $"Error listing reaction roles for user {ctx.User.Id}");
                     await ctx.RespondAsync("An error occurred while retrieving reaction roles. Please try again later.");
+                }
+            }
+        }
+
+        [Command("autorole")]
+        public class AutoRoleCommands
+        {
+            private readonly AdminCommands _parent;
+
+            public AutoRoleCommands(AdminCommands parent)
+            {
+                _parent = parent;
+            }
+
+            [Command("add"), Description("Add a role to be automatically assigned to new members")]
+            [RequirePermissions(DiscordPermissions.ManageRoles)]
+            public async Task AddAutoRole(
+                CommandContext ctx,
+                [Description("Role to automatically assign")] DiscordRole role)
+            {
+                try
+                {
+                    _parent._logger.LogInformation($"User {ctx.User.Id} attempting to add auto-role {role.Name} ({role.Id})");
+
+                    await ctx.DeferResponseAsync();
+
+                    // Add to database
+                    var success = await _parent._autoRoleDAL.AddAutoRoleAsync((long)role.Id, role.Name);
+
+                    if (!success)
+                    {
+                        var errorEmbed = new DiscordEmbedBuilder()
+                            .WithTitle("❌ Auto-Role Already Exists")
+                            .WithDescription($"The role {role.Mention} is already configured as an auto-role.")
+                            .WithColor(DiscordColor.Red)
+                            .WithTimestamp(DateTime.Now);
+
+                        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(errorEmbed));
+                        return;
+                    }
+
+                    var successEmbed = new DiscordEmbedBuilder()
+                        .WithTitle("✅ Auto-Role Added")
+                        .WithDescription($"The role {role.Mention} will now be automatically assigned to all new members.")
+                        .AddField("Role Name", role.Name, true)
+                        .AddField("Role ID", role.Id.ToString(), true)
+                        .WithColor(DiscordColor.Green)
+                        .WithTimestamp(DateTime.Now);
+
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(successEmbed));
+
+                    _parent._logger.LogInformation($"Successfully added auto-role {role.Name} ({role.Id})");
+                }
+                catch (Exception ex)
+                {
+                    _parent._logger.LogError(ex, $"Error adding auto-role {role.Id}");
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(
+                        "An error occurred while adding the auto-role. Please try again later."));
+                }
+            }
+
+            [Command("remove"), Description("Remove a role from auto-assignment")]
+            [RequirePermissions(DiscordPermissions.ManageRoles)]
+            public async Task RemoveAutoRole(
+                CommandContext ctx,
+                [Description("Role to remove from auto-assignment")] DiscordRole role)
+            {
+                try
+                {
+                    _parent._logger.LogInformation($"User {ctx.User.Id} attempting to remove auto-role {role.Name} ({role.Id})");
+
+                    await ctx.DeferResponseAsync();
+
+                    // Remove from database
+                    var success = await _parent._autoRoleDAL.RemoveAutoRoleAsync((long)role.Id);
+
+                    if (!success)
+                    {
+                        var errorEmbed = new DiscordEmbedBuilder()
+                            .WithTitle("❌ Auto-Role Not Found")
+                            .WithDescription($"The role {role.Mention} is not configured as an auto-role.")
+                            .WithColor(DiscordColor.Red)
+                            .WithTimestamp(DateTime.Now);
+
+                        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(errorEmbed));
+                        return;
+                    }
+
+                    var successEmbed = new DiscordEmbedBuilder()
+                        .WithTitle("✅ Auto-Role Removed")
+                        .WithDescription($"The role {role.Mention} will no longer be automatically assigned to new members.")
+                        .AddField("Role Name", role.Name, true)
+                        .AddField("Role ID", role.Id.ToString(), true)
+                        .WithColor(DiscordColor.Orange)
+                        .WithTimestamp(DateTime.Now);
+
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(successEmbed));
+
+                    _parent._logger.LogInformation($"Successfully removed auto-role {role.Name} ({role.Id})");
+                }
+                catch (Exception ex)
+                {
+                    _parent._logger.LogError(ex, $"Error removing auto-role {role.Id}");
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(
+                        "An error occurred while removing the auto-role. Please try again later."));
+                }
+            }
+
+            [Command("list"), Description("List all roles that are automatically assigned to new members")]
+            [RequirePermissions(DiscordPermissions.ManageRoles)]
+            public async Task ListAutoRoles(CommandContext ctx)
+            {
+                try
+                {
+                    _parent._logger.LogInformation($"User {ctx.User.Id} requesting auto-role list");
+
+                    await ctx.DeferResponseAsync();
+
+                    // Get all auto-roles
+                    var autoRoles = await _parent._autoRoleDAL.GetAllAutoRolesAsync();
+
+                    if (autoRoles == null || autoRoles.Count == 0)
+                    {
+                        var emptyEmbed = new DiscordEmbedBuilder()
+                            .WithTitle("📋 Auto-Roles")
+                            .WithDescription("No auto-roles are currently configured.\n\nUse `/admin autorole add` to add roles that will be automatically assigned to new members.")
+                            .WithColor(DiscordColor.Blue)
+                            .WithTimestamp(DateTime.Now);
+
+                        await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(emptyEmbed));
+                        return;
+                    }
+
+                    var embed = new DiscordEmbedBuilder()
+                        .WithTitle("📋 Auto-Roles")
+                        .WithDescription($"The following {autoRoles.Count} role(s) are automatically assigned to new members:")
+                        .WithColor(DiscordColor.Blue)
+                        .WithTimestamp(DateTime.Now);
+
+                    var guild = ctx.Guild;
+                    var validRoles = new List<string>();
+                    var invalidRoles = new List<string>();
+
+                    foreach (var autoRole in autoRoles)
+                    {
+                        try
+                        {
+                            var role = await guild.GetRoleAsync((ulong)autoRole.RoleId);
+                            if (role != null)
+                            {
+                                validRoles.Add($"{role.Mention} - `{role.Name}` (ID: {role.Id})");
+                            }
+                            else
+                            {
+                                invalidRoles.Add($"⚠️ **{autoRole.RoleName}** (ID: {autoRole.RoleId}) - Role not found in server");
+                            }
+                        }
+                        catch
+                        {
+                            invalidRoles.Add($"⚠️ **{autoRole.RoleName}** (ID: {autoRole.RoleId}) - Error accessing role");
+                        }
+                    }
+
+                    if (validRoles.Count > 0)
+                    {
+                        embed.AddField("Active Auto-Roles", string.Join("\n", validRoles), false);
+                    }
+
+                    if (invalidRoles.Count > 0)
+                    {
+                        embed.AddField("⚠️ Invalid Roles", string.Join("\n", invalidRoles), false);
+                        embed.WithFooter("Invalid roles should be removed using /admin autorole remove");
+                    }
+
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().AddEmbed(embed));
+
+                    _parent._logger.LogInformation($"Listed {autoRoles.Count} auto-roles for user {ctx.User.Id}");
+                }
+                catch (Exception ex)
+                {
+                    _parent._logger.LogError(ex, "Error listing auto-roles");
+                    await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(
+                        "An error occurred while retrieving auto-roles. Please try again later."));
                 }
             }
         }

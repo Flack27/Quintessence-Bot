@@ -45,6 +45,8 @@ public partial class QutieDataTestContext : DbContext
 
     public virtual DbSet<User> Users { get; set; }
 
+    public virtual DbSet<AutoRole> AutoRoles { get; set; }
+
     public virtual DbSet<UserData> UserData { get; set; }
 
     public virtual DbSet<Xpconfig> Xpconfigs { get; set; }
@@ -96,6 +98,17 @@ public partial class QutieDataTestContext : DbContext
                 .WithMany()
                 .HasForeignKey(d => d.GameId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<AutoRole>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+
+            entity.HasOne(d => d.Role)
+                .WithMany()
+                .HasForeignKey(d => d.RoleId)
+                .OnDelete(DeleteBehavior.Cascade)
+                .HasConstraintName("FK_AutoRoles_Roles");
         });
 
         modelBuilder.Entity<UserVoiceActivitySummary>(entity =>

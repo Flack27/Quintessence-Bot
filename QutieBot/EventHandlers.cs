@@ -38,6 +38,7 @@ namespace QutieBot
         private readonly InterviewRoom _interviewRoom;
         private readonly GoogleSheetsFacade _googleSheets;
         private readonly WelcomeLeaveMessenger _welcomeLeaveMessenger;
+        private readonly AutoRoleManager _autoRoleManager;
         private readonly ILogger<EventHandlers> _logger;
 
         /// <summary>
@@ -53,6 +54,7 @@ namespace QutieBot
             GoogleSheetsFacade googleSheets,
             ReactionRoleHandler reactionRoleHandler,
             WelcomeLeaveMessenger welcomeLeaveMessenger,
+            AutoRoleManager autoRoleManager,
             ILogger<EventHandlers> logger)
         {
             _discordInfoSaver = discordInfoSaver ?? throw new ArgumentNullException(nameof(discordInfoSaver));
@@ -64,6 +66,7 @@ namespace QutieBot
             _googleSheets = googleSheets ?? throw new ArgumentNullException(nameof(googleSheets));
             _reactionRoleHandler = reactionRoleHandler ?? throw new ArgumentNullException(nameof(reactionRoleHandler));
             _welcomeLeaveMessenger = welcomeLeaveMessenger ?? throw new ArgumentNullException(nameof(welcomeLeaveMessenger));
+            _autoRoleManager = autoRoleManager ?? throw new ArgumentNullException(nameof(autoRoleManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -127,7 +130,8 @@ namespace QutieBot
                 var tasks = new Task[]
                 {
                     _discordInfoSaver.Client_GuildMemberAdded(client, e),
-                    _welcomeLeaveMessenger.SendWelcomeMessageAsync(client, e)
+                    _welcomeLeaveMessenger.SendWelcomeMessageAsync(client, e),
+                    _autoRoleManager.AssignAutoRolesAsync(client, e)
                 };
 
                 await Task.WhenAll(tasks);
