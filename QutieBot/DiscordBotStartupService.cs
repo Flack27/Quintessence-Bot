@@ -39,7 +39,7 @@ namespace QutieBot
 
                 // Connect the Discord client
                 _logger.LogInformation("Connecting Discord client");
-                DiscordActivity status = new("over Quintessence", DiscordActivityType.Watching);
+                DiscordActivity status = new("quintessence-eu.com", DiscordActivityType.Custom);
                 await _client.ConnectAsync(status, DiscordUserStatus.Online);
 
                 _logger.LogInformation("Discord bot startup completed successfully");
