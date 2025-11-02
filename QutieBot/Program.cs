@@ -187,6 +187,7 @@ namespace QutieBot.Bot.Commands
             services.AddSingleton<ReactionRoleHandler>();
             services.AddSingleton<GenerateImage>();
             services.AddSingleton<AutomatedCheckService>();
+            services.AddSingleton<WelcomeLeaveMessenger>();
 
             // Background services
             services.AddHostedService<ScheduleMemberCountUpdateService>();

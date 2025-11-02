@@ -246,7 +246,7 @@ namespace QutieBot.Bot
             var embed = new DiscordEmbedBuilder()
                 .WithTitle("Message Level Up!")
                 .WithDescription($"{user.Mention} has reached level {level} in message activity!")
-                .WithColor(DiscordColor.Green)
+                .WithColor(DiscordColor.Purple)
                 .WithThumbnail(user.AvatarUrl)
                 .WithFooter("Keep up the great conversations!");
 
