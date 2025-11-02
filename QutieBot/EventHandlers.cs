@@ -39,6 +39,7 @@ namespace QutieBot
         private readonly GoogleSheetsFacade _googleSheets;
         private readonly WelcomeLeaveMessenger _welcomeLeaveMessenger;
         private readonly AutoRoleManager _autoRoleManager;
+        private readonly DmRelayService _dmRelayService;
         private readonly ILogger<EventHandlers> _logger;
 
         /// <summary>
@@ -55,6 +56,7 @@ namespace QutieBot
             ReactionRoleHandler reactionRoleHandler,
             WelcomeLeaveMessenger welcomeLeaveMessenger,
             AutoRoleManager autoRoleManager,
+            DmRelayService dmRelayService,
             ILogger<EventHandlers> logger)
         {
             _discordInfoSaver = discordInfoSaver ?? throw new ArgumentNullException(nameof(discordInfoSaver));
@@ -67,6 +69,7 @@ namespace QutieBot
             _reactionRoleHandler = reactionRoleHandler ?? throw new ArgumentNullException(nameof(reactionRoleHandler));
             _welcomeLeaveMessenger = welcomeLeaveMessenger ?? throw new ArgumentNullException(nameof(welcomeLeaveMessenger));
             _autoRoleManager = autoRoleManager ?? throw new ArgumentNullException(nameof(autoRoleManager));
+            _dmRelayService = dmRelayService ?? throw new ArgumentNullException(nameof(dmRelayService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -279,7 +282,14 @@ namespace QutieBot
                     _logger.LogDebug($"Message from {e.Author.Username} ({e.Author.Id}) in {channelName}");
                 }
 
-                await _userMessageXPCounter.OnMessageReceived(client, e);
+                var tasks = new Task[]
+                {
+                    _userMessageXPCounter.OnMessageReceived(client, e),
+                    _dmRelayService.HandleDmAsync(client, e),
+                    _dmRelayService.HandleReplyAsync(client, e)
+                };
+
+                await Task.WhenAll(tasks);
             }
             catch (Exception ex)
             {
