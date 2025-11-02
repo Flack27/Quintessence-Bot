@@ -157,6 +157,7 @@ namespace QutieBot.Bot.Commands
             services.AddSingleton<UserSheetDAL>();
             services.AddSingleton<CommandsDAL>();
             services.AddSingleton<AutomatedCheckDAL>();
+            services.AddSingleton<AutoRoleDAL>();
 
             services.AddSingleton<AocCommandsDAL>();
             services.AddScoped<WwmCommandsDAL>();
@@ -188,6 +189,7 @@ namespace QutieBot.Bot.Commands
             services.AddSingleton<GenerateImage>();
             services.AddSingleton<AutomatedCheckService>();
             services.AddSingleton<WelcomeLeaveMessenger>();
+            services.AddSingleton<AutoRoleManager>();
 
             // Background services
             services.AddHostedService<ScheduleMemberCountUpdateService>();
