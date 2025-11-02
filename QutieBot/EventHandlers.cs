@@ -37,6 +37,7 @@ namespace QutieBot
         private readonly ReactionRoleHandler _reactionRoleHandler;
         private readonly InterviewRoom _interviewRoom;
         private readonly GoogleSheetsFacade _googleSheets;
+        private readonly WelcomeLeaveMessenger _welcomeLeaveMessenger;
         private readonly ILogger<EventHandlers> _logger;
 
         /// <summary>
@@ -51,6 +52,7 @@ namespace QutieBot
             InterviewRoom interviewRoom,
             GoogleSheetsFacade googleSheets,
             ReactionRoleHandler reactionRoleHandler,
+            WelcomeLeaveMessenger welcomeLeaveMessenger,
             ILogger<EventHandlers> logger)
         {
             _discordInfoSaver = discordInfoSaver ?? throw new ArgumentNullException(nameof(discordInfoSaver));
@@ -61,6 +63,7 @@ namespace QutieBot
             _interviewRoom = interviewRoom ?? throw new ArgumentNullException(nameof(interviewRoom));
             _googleSheets = googleSheets ?? throw new ArgumentNullException(nameof(googleSheets));
             _reactionRoleHandler = reactionRoleHandler ?? throw new ArgumentNullException(nameof(reactionRoleHandler));
+            _welcomeLeaveMessenger = welcomeLeaveMessenger ?? throw new ArgumentNullException(nameof(welcomeLeaveMessenger));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -120,7 +123,14 @@ namespace QutieBot
             try
             {
                 _logger.LogInformation($"Member joined: {e.Member.Username} ({e.Member.Id}) in guild {e.Guild.Name}");
-                await _discordInfoSaver.Client_GuildMemberAdded(client, e);
+
+                var tasks = new Task[]
+                {
+                    _discordInfoSaver.Client_GuildMemberAdded(client, e),
+                    _welcomeLeaveMessenger.SendWelcomeMessageAsync(client, e)
+                };
+
+                await Task.WhenAll(tasks);
             }
             catch (Exception ex)
             {
@@ -163,7 +173,8 @@ namespace QutieBot
                 var tasks = new Task[]
                 {
                     _discordInfoSaver.Client_GuildMemberRemoved(client, e),
-                    _interviewRoom.HandleUserLeftAsync(client, e)
+                    _interviewRoom.HandleUserLeftAsync(client, e),
+                    _welcomeLeaveMessenger.SendLeaveMessageAsync(client, e)
                 };
 
                 await Task.WhenAll(tasks);
