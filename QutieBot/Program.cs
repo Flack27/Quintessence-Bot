@@ -191,6 +191,7 @@ namespace QutieBot.Bot.Commands
             services.AddSingleton<WelcomeLeaveMessenger>();
             services.AddSingleton<AutoRoleManager>();
             services.AddSingleton<DmRelayService>();
+            services.AddSingleton<InterviewFollowUpService>();
 
             // Background services
             services.AddHostedService<ScheduleMemberCountUpdateService>();
