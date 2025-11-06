@@ -1915,11 +1915,12 @@ namespace QutieBot.Bot.Commands
                     // Check if this is an interview channel
                     if (!channel.Name.EndsWith("-interview"))
                     {
-                        await ctx.RespondAsync(new DiscordEmbedBuilder()
-                            .WithTitle("❌ Not an Interview Channel")
-                            .WithDescription("This command can only be used in interview channels.")
-                            .WithColor(DiscordColor.Red)
-                            .Build());
+                        await ctx.RespondAsync(new DiscordInteractionResponseBuilder()
+                            .AddEmbed(new DiscordEmbedBuilder()
+                                .WithTitle("❌ Not an Interview Channel")
+                                .WithDescription("This command can only be used in interview channels.")
+                                .WithColor(DiscordColor.Red))
+                            .AsEphemeral(true));
                         return;
                     }
 
@@ -1956,7 +1957,7 @@ namespace QutieBot.Bot.Commands
                     var builder = new DiscordInteractionResponseBuilder()
                         .AddEmbed(embed)
                         .AddComponents(pauseButton, extendButton, resumeButton)
-                        .AsEphemeral(true); // THIS MAKES IT ONLY VISIBLE TO THE ADMIN!
+                        .AsEphemeral(true);
 
                     await ctx.RespondAsync(builder);
 
@@ -1965,7 +1966,9 @@ namespace QutieBot.Bot.Commands
                 catch (Exception ex)
                 {
                     _parent._logger.LogError(ex, $"Error showing timer controls for user {ctx.User.Id}");
-                    await ctx.RespondAsync("An error occurred while retrieving timer controls. Please try again later.");
+                    await ctx.RespondAsync(new DiscordInteractionResponseBuilder()
+                        .WithContent("An error occurred while retrieving controls. Please try again later.")
+                        .AsEphemeral(true));
                 }
             }
 
@@ -1983,11 +1986,12 @@ namespace QutieBot.Bot.Commands
                     // Check if this is an interview channel
                     if (!channel.Name.EndsWith("-interview"))
                     {
-                        await ctx.RespondAsync(new DiscordEmbedBuilder()
-                            .WithTitle("❌ Not an Interview Channel")
-                            .WithDescription("This command can only be used in interview channels.")
-                            .WithColor(DiscordColor.Red)
-                            .Build());
+                        await ctx.RespondAsync(new DiscordInteractionResponseBuilder()
+                            .AddEmbed(new DiscordEmbedBuilder()
+                                .WithTitle("❌ Not an Interview Channel")
+                                .WithDescription("This command can only be used in interview channels.")
+                                .WithColor(DiscordColor.Red))
+                            .AsEphemeral(true));
                         return;
                     }
 
@@ -1995,7 +1999,9 @@ namespace QutieBot.Bot.Commands
                     var followUpService = _parent._interviewFollowUpService;
                     if (followUpService == null)
                     {
-                        await ctx.RespondAsync("❌ Interview follow-up service is not available.");
+                        await ctx.RespondAsync(new DiscordInteractionResponseBuilder()
+                            .WithContent("❌ Interview follow-up service is not available.")
+                            .AsEphemeral(true));
                         return;
                     }
 
@@ -2003,11 +2009,12 @@ namespace QutieBot.Bot.Commands
 
                     if (timer == null)
                     {
-                        await ctx.RespondAsync(new DiscordEmbedBuilder()
-                            .WithTitle("ℹ️ No Active Timer")
-                            .WithDescription("There is no active follow-up timer for this interview channel.")
-                            .WithColor(DiscordColor.Gray)
-                            .Build());
+                        await ctx.RespondAsync(new DiscordInteractionResponseBuilder()
+                            .AddEmbed(new DiscordEmbedBuilder()
+                                .WithTitle("ℹ️ No Active Timer")
+                                .WithDescription("There is no active follow-up timer for this interview channel.")
+                                .WithColor(DiscordColor.Gray))
+                            .AsEphemeral(true));
                         return;
                     }
 
@@ -2049,12 +2056,16 @@ namespace QutieBot.Bot.Commands
                         }
                     }
 
-                    await ctx.RespondAsync(statusEmbed.Build());
+                    await ctx.RespondAsync(new DiscordInteractionResponseBuilder()
+                        .AddEmbed(statusEmbed)
+                        .AsEphemeral(true));
                 }
                 catch (Exception ex)
                 {
                     _parent._logger.LogError(ex, $"Error checking timer status for user {ctx.User.Id}");
-                    await ctx.RespondAsync("An error occurred while checking timer status. Please try again later.");
+                    await ctx.RespondAsync(new DiscordInteractionResponseBuilder()
+                        .WithContent("An error occurred while checking timer status. Please try again later.")
+                        .AsEphemeral(true));
                 }
             }
         }
