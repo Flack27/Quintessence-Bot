@@ -40,6 +40,7 @@ namespace QutieBot
         private readonly WelcomeLeaveMessenger _welcomeLeaveMessenger;
         private readonly AutoRoleManager _autoRoleManager;
         private readonly DmRelayService _dmRelayService;
+        private readonly InterviewFollowUpService _interviewFollowUpService;
         private readonly ILogger<EventHandlers> _logger;
 
         /// <summary>
@@ -57,6 +58,7 @@ namespace QutieBot
             WelcomeLeaveMessenger welcomeLeaveMessenger,
             AutoRoleManager autoRoleManager,
             DmRelayService dmRelayService,
+            InterviewFollowUpService interviewFollowUpService,
             ILogger<EventHandlers> logger)
         {
             _discordInfoSaver = discordInfoSaver ?? throw new ArgumentNullException(nameof(discordInfoSaver));
@@ -70,6 +72,7 @@ namespace QutieBot
             _welcomeLeaveMessenger = welcomeLeaveMessenger ?? throw new ArgumentNullException(nameof(welcomeLeaveMessenger));
             _autoRoleManager = autoRoleManager ?? throw new ArgumentNullException(nameof(autoRoleManager));
             _dmRelayService = dmRelayService ?? throw new ArgumentNullException(nameof(dmRelayService));
+            _interviewFollowUpService = interviewFollowUpService ?? throw new ArgumentNullException(nameof(interviewFollowUpService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -286,7 +289,8 @@ namespace QutieBot
                 {
                     _userMessageXPCounter.OnMessageReceived(client, e),
                     _dmRelayService.HandleDmAsync(client, e),
-                    _dmRelayService.HandleReplyAsync(client, e)
+                    _dmRelayService.HandleReplyAsync(client, e),
+                    _interviewFollowUpService.OnMessageCreated(client, e)
                 };
 
                 await Task.WhenAll(tasks);
@@ -344,7 +348,14 @@ namespace QutieBot
             try
             {
                 _logger.LogDebug($"Component interaction: {e.Id} by {e.User.Username} ({e.User.Id})");
-                await _interviewRoom.HandleButtonPressAsync(client, e);
+
+                var tasks = new Task[]
+                {
+                    _interviewRoom.HandleButtonPressAsync(client, e),
+                    _interviewFollowUpService.HandleTimerButtonAsync(client, e)
+                };
+
+                await Task.WhenAll(tasks);
             }
             catch (Exception ex)
             {

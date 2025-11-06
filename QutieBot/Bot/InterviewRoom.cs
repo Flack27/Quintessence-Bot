@@ -23,6 +23,7 @@ namespace QutieBot.Bot
         private readonly DiscordClient _client;
         private readonly ILogger<InterviewRoom> _logger;
         private readonly DiscordInfoSaverDAL _discordInfoSaverDAL;
+        private InterviewFollowUpService _followUpService;
 
         // Active interview tracking
         private readonly Dictionary<ulong, InterviewData> _activeInterviews = new Dictionary<ulong, InterviewData>();
@@ -34,6 +35,7 @@ namespace QutieBot.Bot
             DiscordClient client,
             ILogger<InterviewRoom> logger,
             DiscordInfoSaverDAL discordInfoSaverDAL,
+            InterviewFollowUpService followUpService,
             ulong categoryId = 1308761605105909790,
             ulong adminRoleId = 1152617541190041600)
         {
@@ -42,9 +44,12 @@ namespace QutieBot.Bot
             _categoryId = categoryId;
             _adminRoleId = adminRoleId;
             _discordInfoSaverDAL = discordInfoSaverDAL;
+            _followUpService = followUpService;
+            followUpService.SetInterviewRoom(this);
 
             _logger.LogInformation($"InterviewRoom initialized with category {_categoryId} and admin role {_adminRoleId}");
         }
+
 
         /// <summary>
         /// Creates a new interview room for a user
@@ -266,6 +271,11 @@ namespace QutieBot.Bot
                     var submissionId = interviewData.SubmissionId;
                     _logger.LogInformation($"User {userId} left with active interview room {channelId}");
 
+                    if (_followUpService != null)
+                    {
+                        await _followUpService.ManualCancelTimerAsync(channelId);
+                    }
+
                     await _discordInfoSaverDAL.UpdateDatabaseForUserLeft(userId, submissionId);
 
                     // Get the channel
@@ -393,6 +403,11 @@ namespace QutieBot.Bot
                 return;
             }
 
+            if (_followUpService != null)
+            {
+                await _followUpService.ManualCancelTimerAsync(channelId);
+            }
+
             // Find the user who this interview belongs to
             var userOverwrite = channel.PermissionOverwrites
                 .FirstOrDefault(o => o.Type == DiscordOverwriteType.Member &&
@@ -479,6 +494,11 @@ namespace QutieBot.Bot
                 return;
             }
 
+            if (_followUpService != null)
+            {
+                await _followUpService.ManualCancelTimerAsync(channelId);
+            }
+
             // Acknowledge the interaction
             await e.Interaction.CreateResponseAsync(DiscordInteractionResponseType.DeferredMessageUpdate);
 
@@ -516,6 +536,11 @@ namespace QutieBot.Bot
                         .WithContent("❌ You don't have permission to archive this channel. Only admins can do this.")
                         .AsEphemeral(true));
                 return;
+            }
+
+            if (_followUpService != null)
+            {
+                await _followUpService.ManualCancelTimerAsync(channelId);
             }
 
             // Acknowledge the interaction

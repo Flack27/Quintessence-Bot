@@ -32,10 +32,9 @@ namespace QutieBot.Bot.Commands
         private readonly AutomatedCheckService _automatedCheckService;
         private readonly CommandsDAL _commandsDAL;
         private readonly AutoRoleDAL _autoRoleDAL;
-        private readonly AutoRoleCommands _autoRoleCommands;
+        private readonly InterviewFollowUpService _interviewFollowUpService;
         private readonly ILogger<AdminCommands> _logger;
 
-        private readonly ChannelCommands _channelCommands;
 
         public AdminCommands(
             JoinToCreateManager joinToCreateChannelBot,
@@ -44,26 +43,19 @@ namespace QutieBot.Bot.Commands
             CommandsDAL commandsDAL,
             AutomatedCheckService automatedCheckService,
             AutoRoleDAL autoRoleDAL,
+            InterviewFollowUpService interviewFollowUpService,
             ILogger<AdminCommands> logger)
         {
             _joinToCreateChannelBot = joinToCreateChannelBot ?? throw new ArgumentNullException(nameof(joinToCreateChannelBot));
             _commandsModule = commandsModule ?? throw new ArgumentNullException(nameof(commandsModule));
             _googleSheetsFacade = googleSheetsFacade ?? throw new ArgumentNullException(nameof(googleSheetsFacade));
             _automatedCheckService = automatedCheckService ?? throw new ArgumentNullException(nameof(automatedCheckService));
+            _interviewFollowUpService = interviewFollowUpService ?? throw new ArgumentNullException(nameof(interviewFollowUpService));
             _commandsDAL = commandsDAL ?? throw new ArgumentNullException(nameof(commandsDAL));
             _autoRoleDAL = autoRoleDAL ?? throw new ArgumentNullException(nameof(autoRoleDAL));
-            _autoRoleCommands = new AutoRoleCommands(this);
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
-            _channelCommands = new ChannelCommands(this);
         }
-
-        internal JoinToCreateManager JoinToCreateChannelBot => _joinToCreateChannelBot;
-        internal CommandsModule CommandsModule => _commandsModule;
-        internal GoogleSheetsFacade GoogleSheetsFacade => _googleSheetsFacade;
-        internal CommandsDAL CommandsDAL => _commandsDAL;
-        internal AutoRoleDAL AutoRoleDAL => _autoRoleDAL;
-        internal ILogger<AdminCommands> Logger => _logger;
 
 
         [Command("commands"), Description("Show all available admin commands")]
@@ -1892,6 +1884,177 @@ namespace QutieBot.Bot.Commands
                     _parent._logger.LogError(ex, "Error listing auto-roles");
                     await ctx.EditResponseAsync(new DiscordWebhookBuilder().WithContent(
                         "An error occurred while retrieving auto-roles. Please try again later."));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Interview timer management commands
+        /// </summary>
+        [Command("interview")]
+        public class InterviewCommands
+        {
+            private readonly AdminCommands _parent;
+
+            public InterviewCommands(AdminCommands parent)
+            {
+                _parent = parent;
+            }
+
+            /// <summary>
+            /// Shows timer control buttons (ephemeral - only visible to you)
+            /// </summary>
+            [Command("control"), Description("Show timer control buttons for this interview (only you can see them)")]
+            [RequirePermissions(DiscordPermissions.ModerateMembers)]
+            public async Task Control(CommandContext ctx)
+            {
+                try
+                {
+                    var channel = ctx.Channel;
+
+                    // Check if this is an interview channel
+                    if (!channel.Name.EndsWith("-interview"))
+                    {
+                        await ctx.RespondAsync(new DiscordEmbedBuilder()
+                            .WithTitle("❌ Not an Interview Channel")
+                            .WithDescription("This command can only be used in interview channels.")
+                            .WithColor(DiscordColor.Red)
+                            .Build());
+                        return;
+                    }
+
+                    _parent._logger.LogInformation($"Admin {ctx.User.Id} requested timer controls for channel {channel.Id}");
+
+                    // Create control buttons
+                    var pauseButton = new DiscordButtonComponent(
+                        DiscordButtonStyle.Secondary,
+                        $"timer_pause_{channel.Id}",
+                        "⏸️ Pause Timer",
+                        false);
+
+                    var extendButton = new DiscordButtonComponent(
+                        DiscordButtonStyle.Primary,
+                        $"timer_extend_{channel.Id}",
+                        "⏱️ Extend +24h",
+                        false);
+
+                    var resumeButton = new DiscordButtonComponent(
+                        DiscordButtonStyle.Success,
+                        $"timer_resume_{channel.Id}",
+                        "▶️ Resume Timer",
+                        false);
+
+                    var embed = new DiscordEmbedBuilder()
+                        .WithTitle("⏰ Interview Timer Controls")
+                        .WithDescription("Use these buttons to manage the follow-up timer:\n\n" +
+                                       "• **⏸️ Pause Timer** - Stop the timer indefinitely (e.g., applicant said they'll be away)\n" +
+                                       "• **⏱️ Extend +24h** - Give the applicant 24 more hours from now\n" +
+                                       "• **▶️ Resume Timer** - Resume a paused timer (restarts when you send next message)")
+                        .WithColor(DiscordColor.Blurple)
+                        .WithFooter("Only you can see this message");
+
+                    var builder = new DiscordInteractionResponseBuilder()
+                        .AddEmbed(embed)
+                        .AddComponents(pauseButton, extendButton, resumeButton)
+                        .AsEphemeral(true); // THIS MAKES IT ONLY VISIBLE TO THE ADMIN!
+
+                    await ctx.RespondAsync(builder);
+
+                    _parent._logger.LogInformation($"Sent ephemeral timer controls to admin {ctx.User.Id}");
+                }
+                catch (Exception ex)
+                {
+                    _parent._logger.LogError(ex, $"Error showing timer controls for user {ctx.User.Id}");
+                    await ctx.RespondAsync("An error occurred while retrieving timer controls. Please try again later.");
+                }
+            }
+
+            /// <summary>
+            /// Check the current status of the interview timer
+            /// </summary>
+            [Command("status"), Description("Check the status of the timer for this interview")]
+            [RequirePermissions(DiscordPermissions.ModerateMembers)]
+            public async Task Status(CommandContext ctx)
+            {
+                try
+                {
+                    var channel = ctx.Channel;
+
+                    // Check if this is an interview channel
+                    if (!channel.Name.EndsWith("-interview"))
+                    {
+                        await ctx.RespondAsync(new DiscordEmbedBuilder()
+                            .WithTitle("❌ Not an Interview Channel")
+                            .WithDescription("This command can only be used in interview channels.")
+                            .WithColor(DiscordColor.Red)
+                            .Build());
+                        return;
+                    }
+
+                    // Get the service through the parent's access
+                    var followUpService = _parent._interviewFollowUpService;
+                    if (followUpService == null)
+                    {
+                        await ctx.RespondAsync("❌ Interview follow-up service is not available.");
+                        return;
+                    }
+
+                    var timer = followUpService.GetTimerInfo(channel.Id);
+
+                    if (timer == null)
+                    {
+                        await ctx.RespondAsync(new DiscordEmbedBuilder()
+                            .WithTitle("ℹ️ No Active Timer")
+                            .WithDescription("There is no active follow-up timer for this interview channel.")
+                            .WithColor(DiscordColor.Gray)
+                            .Build());
+                        return;
+                    }
+
+                    var elapsed = DateTimeOffset.UtcNow - timer.StartTime;
+                    var timeRemaining = TimeSpan.FromHours(24) - elapsed;
+
+                    var statusEmbed = new DiscordEmbedBuilder()
+                        .WithTitle("⏰ Timer Status")
+                        .AddField("Stage", timer.Stage.ToString(), true)
+                        .AddField("State", timer.IsPaused ? "⏸️ Paused" : "▶️ Running", true)
+                        .AddField("Started", $"<t:{timer.StartTime.ToUnixTimeSeconds()}:R>", false)
+                        .WithColor(timer.IsPaused ? DiscordColor.Orange : DiscordColor.Green);
+
+                    if (!timer.IsPaused && timer.Stage == TimerStage.FirstWarning)
+                    {
+                        if (timeRemaining.TotalMinutes > 0)
+                        {
+                            statusEmbed.AddField("Time Until Warning",
+                                $"{(int)timeRemaining.TotalHours}h {timeRemaining.Minutes}m", false);
+                        }
+                        else
+                        {
+                            statusEmbed.AddField("Warning", "Due to be sent soon", false);
+                        }
+                    }
+                    else if (!timer.IsPaused && timer.Stage == TimerStage.FinalWarning && timer.FirstWarningSentAt.HasValue)
+                    {
+                        var finalElapsed = DateTimeOffset.UtcNow - timer.FirstWarningSentAt.Value;
+                        var finalRemaining = TimeSpan.FromHours(24) - finalElapsed;
+
+                        if (finalRemaining.TotalMinutes > 0)
+                        {
+                            statusEmbed.AddField("Time Until Closure",
+                                $"{(int)finalRemaining.TotalHours}h {finalRemaining.Minutes}m", false);
+                        }
+                        else
+                        {
+                            statusEmbed.AddField("Closure", "Due to happen soon", false);
+                        }
+                    }
+
+                    await ctx.RespondAsync(statusEmbed.Build());
+                }
+                catch (Exception ex)
+                {
+                    _parent._logger.LogError(ex, $"Error checking timer status for user {ctx.User.Id}");
+                    await ctx.RespondAsync("An error occurred while checking timer status. Please try again later.");
                 }
             }
         }
