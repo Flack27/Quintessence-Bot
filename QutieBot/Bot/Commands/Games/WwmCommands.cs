@@ -52,7 +52,7 @@ namespace QutieBot.Bot.Commands.Games
             commandInfo.AppendLine("- `level` - Your current character level");
             commandInfo.AppendLine("- `primary` - Your primary weapon");
             commandInfo.AppendLine("- `secondary` - Your secondary weapon");
-            commandInfo.AppendLine("- `role` - Your role (DPS, Support, Healer)");
+            commandInfo.AppendLine("- `role` - Your role (DPS, Tank, Healer)");
             commandInfo.AppendLine("- `style` - Your gameplay style (Casual, Hardcore, etc.)");
 
             var embed = new DiscordEmbedBuilder()
@@ -193,14 +193,13 @@ namespace QutieBot.Bot.Commands.Games
             {
                 var choices = new Dictionary<string, object>
                 {
-                    { "Swords", "Swords" },
-                    { "Dual Blades", "Dual Blades" },
-                    { "Spears", "Spears" },
-                    { "Rope Darts", "Rope Darts" },
-                    { "Fans", "Fans" },
-                    { "Combat Umbrellas", "Combat Umbrellas" },
-                    { "Mo Blades", "Mo Blades" },
-                    { "Bows", "Bows" }
+                    { "Sword", "Sword" },
+                    { "Dual Blade", "Dual Blade" },
+                    { "Spear", "Spear" },
+                    { "Rope Dart", "Rope Dart" },
+                    { "Fan", "Fan" },
+                    { "Umbrella", "Umbrella" },
+                    { "Mo Dao", "Mo Dao" }
                 };
 
                 return new ValueTask<IReadOnlyDictionary<string, object>>(choices);
@@ -213,15 +212,13 @@ namespace QutieBot.Bot.Commands.Games
             {
                 var choices = new Dictionary<string, object>
                 {
-                    { "None", "None" },
-                    { "Swords", "Swords" },
-                    { "Dual Blades", "Dual Blades" },
-                    { "Spears", "Spears" },
-                    { "Rope Darts", "Rope Darts" },
-                    { "Fans", "Fans" },
-                    { "Combat Umbrellas", "Combat Umbrellas" },
-                    { "Mo Blades", "Mo Blades" },
-                    { "Bows", "Bows" }
+                    { "Sword", "Sword" },
+                    { "Dual Blade", "Dual Blade" },
+                    { "Spear", "Spear" },
+                    { "Rope Dart", "Rope Dart" },
+                    { "Fan", "Fan" },
+                    { "Umbrella", "Umbrella" },
+                    { "Mo Dao", "Mo Dao" }
                 };
 
                 return new ValueTask<IReadOnlyDictionary<string, object>>(choices);
@@ -236,8 +233,7 @@ namespace QutieBot.Bot.Commands.Games
                 {
                     { "DPS", "DPS" },
                     { "Support", "Support" },
-                    { "Tank", "Tank" },
-                    { "Hybrid", "Hybrid" }
+                    { "Tank", "Tank" }
                 };
 
                 return new ValueTask<IReadOnlyDictionary<string, object>>(choices);
@@ -253,7 +249,7 @@ namespace QutieBot.Bot.Commands.Games
                     { "Casual", "Casual" },
                     { "Semi-HC", "Semi-HC" },
                     { "Hardcore", "Hardcore" },
-                    { "No-Life", "No-Life" },
+                    { "No-Life", "No-Life" }
                 };
 
                 return new ValueTask<IReadOnlyDictionary<string, object>>(choices);
