@@ -107,7 +107,7 @@ namespace QutieBot.Bot.Commands.Games
             await ctx.RespondAsync(embed);
         }
 
-        [Command("char"), Description("Update your Wuthering Waves character details")]
+        [Command("char"), Description("Update your Where Winds Meet character details")]
         public async Task UpdateWwmData(CommandContext ctx,
                     [Description("Your character name")] string? name = null,
                     [Description("Your character level")] int? level = null,
