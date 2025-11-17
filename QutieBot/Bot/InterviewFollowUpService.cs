@@ -2,6 +2,7 @@ using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Microsoft.Extensions.Logging;
+using QutieDTO.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -432,7 +433,12 @@ namespace QutieBot.Bot
                     .WithFooter("Quintessence Application System")
                     .WithTimestamp(DateTimeOffset.UtcNow);
 
-                await channel.SendMessageAsync(embed);
+                var messageBuilder = new DiscordMessageBuilder()
+                    .WithContent($"<@{userId}>")
+                    .AddEmbed(embed)
+                    .WithAllowedMentions(Mentions.All);
+
+                await channel.SendMessageAsync(messageBuilder);
 
                 _logger.LogInformation($"First warning sent to user {userId} in channel {channel.Id}");
             }
@@ -460,10 +466,21 @@ namespace QutieBot.Bot
                     .WithFooter("Quintessence Application System")
                     .WithTimestamp(DateTimeOffset.UtcNow);
 
-                await channel.SendMessageAsync(closureEmbed);
+                var messageBuilder = new DiscordMessageBuilder()
+                    .WithContent($"<@{userId}>")
+                    .AddEmbed(closureEmbed)
+                    .WithAllowedMentions(Mentions.All);
+
+                await channel.SendMessageAsync(messageBuilder);
 
                 // Wait 10 seconds before deleting
                 await Task.Delay(TimeSpan.FromSeconds(10));
+
+                // Update database and remove from active interviews before deletion
+                if (_interviewRoom != null)
+                {
+                    await _interviewRoom.CleanupInterviewOnTimeout(userId, channel.Id);
+                }
 
                 // Delete the channel
                 await channel.DeleteAsync("Interview closed automatically - no response from applicant");

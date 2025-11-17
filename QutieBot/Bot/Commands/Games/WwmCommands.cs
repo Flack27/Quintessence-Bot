@@ -49,7 +49,7 @@ namespace QutieBot.Bot.Commands.Games
 
             commandInfo.AppendLine("**Character Update Parameters:**");
             commandInfo.AppendLine("- `name` - Your in-game character name");
-            commandInfo.AppendLine("- `level` - Your current character level");
+            commandInfo.AppendLine("- `gearscore` - Your current gearscore");
             commandInfo.AppendLine("- `primary` - Your primary weapon");
             commandInfo.AppendLine("- `secondary` - Your secondary weapon");
             commandInfo.AppendLine("- `role` - Your role (DPS, Tank, Healer)");
@@ -94,7 +94,7 @@ namespace QutieBot.Bot.Commands.Games
 
             var description = new StringBuilder();
             description.AppendLine($"**Character:** {gameData.IGN ?? "Not set"}");
-            description.AppendLine($"**Level:** {gameData.Level?.ToString() ?? "Not set"}");
+            description.AppendLine($"**Gearscore:** {gameData.Level?.ToString() ?? "Not set"}");
             description.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
             description.AppendLine();
             description.AppendLine($"**Primary Weapon:** {gameData.PrimaryWeapon ?? "Not set"}");
@@ -110,7 +110,7 @@ namespace QutieBot.Bot.Commands.Games
         [Command("char"), Description("Update your Where Winds Meet character details")]
         public async Task UpdateWwmData(CommandContext ctx,
                     [Description("Your character name")] string? name = null,
-                    [Description("Your character level")] int? level = null,
+                    [Description("Your gearscore")] int? level = null,
                     [Description("Your primary weapon"), SlashChoiceProvider<PrimaryWeaponProvider>] string? primary = null,
                     [Description("Your secondary weapon"), SlashChoiceProvider<SecondaryWeaponProvider>] string? secondary = null,
                     [Description("Your preferred role"), SlashChoiceProvider<RoleProvider>] string? role = null,
@@ -173,7 +173,7 @@ namespace QutieBot.Bot.Commands.Games
 
             var details = new StringBuilder();
             details.AppendLine($"**Character:** {updatedData.IGN ?? "Not set"}");
-            details.AppendLine($"**Level:** {updatedData.Level?.ToString() ?? "Not set"}");
+            details.AppendLine($"**Gearscore:** {updatedData.Level?.ToString() ?? "Not set"}");
             details.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
             details.AppendLine();
             details.AppendLine($"**Primary Weapon:** {updatedData.PrimaryWeapon ?? "Not set"}");

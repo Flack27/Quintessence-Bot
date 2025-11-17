@@ -256,6 +256,26 @@ namespace QutieBot.Bot
         }
 
         /// <summary>
+        /// Cleans up interview data when closed due to timeout
+        /// </summary>
+        public async Task CleanupInterviewOnTimeout(ulong userId, ulong channelId)
+        {
+            try
+            {
+                if (_activeInterviews.TryGetValue(userId, out var interviewData))
+                {
+                    await _discordInfoSaverDAL.UpdateDatabaseForUserLeft(userId, interviewData.SubmissionId);
+                    _activeInterviews.Remove(userId);
+                    _logger.LogInformation($"Cleaned up interview data for user {userId} after timeout");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error cleaning up interview for user {userId}");
+            }
+        }
+
+        /// <summary>
         /// Checks if a user who left the server has an interview room
         /// </summary>
         public async Task HandleUserLeftAsync(DiscordClient client, GuildMemberRemovedEventArgs e)
