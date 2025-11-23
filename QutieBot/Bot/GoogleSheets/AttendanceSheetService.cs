@@ -25,6 +25,11 @@ namespace QutieBot.Bot.GoogleSheets
             // Constructor
         }
 
+        public async Task ExecuteBulkAttendanceUpdateAsync(string spreadsheetId, BatchUpdateSpreadsheetRequest batchRequest)
+        {
+            await ExecuteBatchUpdateAsync(spreadsheetId, batchRequest);
+        }
+
         public async Task UpdateAttendanceAsync(long userId, Event evt, bool isSignedUp)
         {
             if (evt == null || evt.Channel == null || evt.Channel.Game == null)

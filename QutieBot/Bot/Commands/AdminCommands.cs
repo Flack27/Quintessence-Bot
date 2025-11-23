@@ -609,9 +609,9 @@ namespace QutieBot.Bot.Commands
             [Command("attendees"), Description("Check who signed up but isn't in voice")]
             [RequirePermissions(DiscordPermissions.ModerateMembers)]
             public async Task CheckAttendees(
-            CommandContext ctx,
-            [Description("Event channel to check")] DiscordChannel eventChannel,
-            [Description("Voice channel to verify presence")] DiscordChannel voiceChannel)
+                CommandContext ctx,
+                [Description("Event channel to check")] DiscordChannel eventChannel,
+                [Description("Voice channel to verify presence")] DiscordChannel voiceChannel)
             {
                 try
                 {
@@ -650,27 +650,31 @@ namespace QutieBot.Bot.Commands
                         return;
                     }
 
-                    users = users.OrderByDescending(user => user.specName == "Late" || user.className == "Late" || user.roleName == "Late").ToList();
+                    // Sort to show Late users first
+                    users = users.OrderByDescending(user =>
+                        user.specName == "Late" || user.className == "Late" || user.roleName == "Late").ToList();
 
-                    // Show list of missing users
-                    var response = new StringBuilder();
-                    response.AppendLine($"**{users.Count} users signed up but are not in {voiceChannel.Mention}:**");
+                    // Build and display the permanent user list
+                    var listMessage = new StringBuilder();
+                    listMessage.AppendLine($"**{users.Count} users signed up but are not in {voiceChannel.Mention}:**\n");
 
                     foreach (var user in users)
                     {
                         if (user.specName == "Late" || user.className == "Late" || user.roleName == "Late")
                         {
-                            response.AppendLine($"⏰ [LATE] {user.name}");
+                            listMessage.AppendLine($"⏰ [LATE] {user.name}");
                         }
                         else
                         {
-                            response.AppendLine($"❌ {user.name}");
+                            listMessage.AppendLine($"❌ {user.name}");
                         }
                     }
 
-                    response.AppendLine("\nWhat would you like to do?");
+                    // Post the permanent list message (this stays visible)
+                    await ctx.FollowupAsync(new DiscordWebhookBuilder()
+                        .WithContent(listMessage.ToString()));
 
-                    // Add action buttons
+                    // Now send the action buttons in a separate message
                     var removeAllButton = new DiscordButtonComponent(
                         DiscordButtonStyle.Danger,
                         "remove_all_attendance",
@@ -678,211 +682,49 @@ namespace QutieBot.Bot.Commands
 
                     var selectButton = new DiscordButtonComponent(
                         DiscordButtonStyle.Primary,
-                        "confirm_remove_attendance",
+                        "select_users_attendance",
                         "Select Users");
 
                     var cancelButton = new DiscordButtonComponent(
                         DiscordButtonStyle.Secondary,
-                        "cancel_remove_attendance",
+                        "cancel_attendance",
                         "Cancel");
 
-                    var messageBuilder = new DiscordWebhookBuilder()
-                        .WithContent(response.ToString())
+                    var actionMessage = new DiscordFollowupMessageBuilder()
+                        .WithContent("What would you like to do?")
                         .AddComponents(removeAllButton, selectButton, cancelButton);
 
-                    var responseMsg = await ctx.FollowupAsync(messageBuilder);
+                    var actionMsg = await ctx.FollowupAsync(actionMessage);
 
                     // Wait for button selection
-                    var buttonResult = await responseMsg.WaitForButtonAsync(ctx.User, TimeSpan.FromMinutes(2));
+                    var buttonResult = await actionMsg.WaitForButtonAsync(ctx.User, TimeSpan.FromMinutes(2));
 
                     if (buttonResult.TimedOut)
                     {
-                        await ctx.EditFollowupAsync(responseMsg.Id, new DiscordWebhookBuilder()
-                            .WithContent("You took too long to respond. Please try again."));
-
-                        _parent._logger.LogInformation($"Button selection timed out for user {ctx.User.Id} checking attendees");
+                        await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                            .WithContent("⏱️ Timed out. The user list above remains for your reference."));
+                        _parent._logger.LogInformation($"Button selection timed out for user {ctx.User.Id}");
                         return;
                     }
 
+                    // Acknowledge the button interaction
+                    await buttonResult.Result.Interaction.CreateResponseAsync(
+                        DiscordInteractionResponseType.DeferredMessageUpdate);
+
+                    // Handle button actions
                     if (buttonResult.Result.Id == "remove_all_attendance")
                     {
-                        await ctx.EditFollowupAsync(responseMsg.Id, new DiscordWebhookBuilder()
-                            .WithContent(response.ToString() + "\n\n**Processing removal for all users...**"));
-
-                        var failedUsers = new List<string>();
-                        var failedUsersDb = new List<string>();
-
-                        foreach (var user in users)
-                        {
-                            var result = await _parent._commandsModule.RemoveAttendance(selectedEventId.Value, (long)user.userId);
-                            if (!result)
-                            {
-                                failedUsers.Add(user.name);
-                                continue;
-                            }
-                        }
-
-                        await _parent._commandsModule.UpdateEvents();
-
-                        if (failedUsers.Count == 0 && failedUsersDb.Count == 0)
-                        {
-                            await ctx.EditFollowupAsync(responseMsg.Id, new DiscordWebhookBuilder()
-                                .WithContent($"✅ Attendance has been successfully removed for all {users.Count} selected users."));
-
-                            _parent._logger.LogInformation($"User {ctx.User.Id} removed attendance for all {users.Count} users from event {selectedEventId.Value}");
-                        }
-                        else
-                        {
-                            var finalResponse = new StringBuilder();
-                            finalResponse.AppendLine($"⚠️ Results of attendance removal operation:");
-
-                            if (failedUsers.Count > 0)
-                            {
-                                finalResponse.AppendLine($"\n❌ Failed to remove from RaidHelper ({failedUsers.Count}):");
-                                finalResponse.AppendLine(string.Join(", ", failedUsers));
-                            }
-
-                            if (failedUsersDb.Count > 0)
-                            {
-                                finalResponse.AppendLine($"\n❌ Failed to remove from database ({failedUsersDb.Count}):");
-                                finalResponse.AppendLine(string.Join(", ", failedUsersDb));
-                            }
-
-                            await ctx.EditFollowupAsync(responseMsg.Id, new DiscordWebhookBuilder()
-                                .WithContent(finalResponse.ToString()));
-
-                            _parent._logger.LogWarning($"User {ctx.User.Id} had partial failures removing attendance: {failedUsers.Count} RaidHelper failures, {failedUsersDb.Count} DB failures");
-                        }
+                        await HandleRemoveAllAttendance(ctx, actionMsg, users, selectedEventId.Value);
                     }
-                    else if (buttonResult.Result.Id == "confirm_remove_attendance")
+                    else if (buttonResult.Result.Id == "select_users_attendance")
                     {
-                        await ctx.EditFollowupAsync(responseMsg.Id, new DiscordWebhookBuilder()
-                            .WithContent(response.ToString()));
-
-                        // Create selection options (up to 25 per menu due to Discord limits)
-                        var selectOptions = users.Take(25)
-                            .Select(u => new DiscordSelectComponentOption(u.name, u.userId.ToString()))
-                            .ToList();
-
-                        var overflowOptions = users.Skip(25)
-                            .Select(u => new DiscordSelectComponentOption(u.name, u.userId.ToString()))
-                            .ToList();
-
-                        // Create selection menu(s)
-                        var userSelectMenu1 = new DiscordSelectComponent(
-                            "user_select_1",
-                            "Select users (1-25)",
-                            selectOptions,
-                            minOptions: 1,
-                            maxOptions: selectOptions.Count);
-
-                        var userSelectBuilder = new DiscordWebhookBuilder()
-                            .WithContent($"Select the users whose attendance you want to remove:")
-                            .AddComponents(userSelectMenu1);
-
-                        if (overflowOptions.Count > 0)
-                        {
-                            var userSelectMenu2 = new DiscordSelectComponent(
-                                "user_select_2",
-                                "Select users (26+)",
-                                overflowOptions,
-                                minOptions: 1,
-                                maxOptions: overflowOptions.Count);
-
-                            userSelectBuilder.AddComponents(userSelectMenu2);
-                        }
-
-                        var userSelectResponseMsg = await ctx.FollowupAsync(userSelectBuilder);
-
-                        // Get user selections from first menu
-                        var selectResult1 = await userSelectResponseMsg.WaitForSelectAsync(ctx.User, "user_select_1", TimeSpan.FromMinutes(2));
-
-                        // Check for second menu if it exists
-                        var selectResult2 = new InteractivityResult<ComponentInteractionCreatedEventArgs>();
-                        bool checkResult2 = overflowOptions.Count > 0;
-
-                        if (checkResult2)
-                        {
-                            selectResult2 = await userSelectResponseMsg.WaitForSelectAsync(ctx.User, "user_select_2", TimeSpan.FromMinutes(2));
-                        }
-
-                        if (selectResult1.TimedOut || (checkResult2 && selectResult2.TimedOut))
-                        {
-                            await ctx.EditFollowupAsync(userSelectResponseMsg.Id, new DiscordWebhookBuilder()
-                                .WithContent("You took too long to respond. Please try again."));
-
-                            _parent._logger.LogInformation($"User selection timed out for user {ctx.User.Id}");
-                            return;
-                        }
-
-                        // Combine selections
-                        var selectedUserIds = selectResult1.Result.Values.Select(long.Parse).ToList();
-
-                        if (checkResult2 && selectResult2.Result != null)
-                        {
-                            selectedUserIds.AddRange(selectResult2.Result.Values.Select(long.Parse));
-                        }
-
-                        // Update message to show processing is underway
-                        await ctx.EditFollowupAsync(userSelectResponseMsg.Id, new DiscordWebhookBuilder()
-                            .WithContent($"Processing removal for {selectedUserIds.Count} selected users..."));
-
-                        var failedUsers = new List<string>();
-                        var failedUsersDb = new List<string>();
-
-                        // Process each selected user
-                        foreach (var userId in selectedUserIds)
-                        {
-                            // Remove from RaidHelper
-                            var result = await _parent._commandsModule.RemoveAttendance(selectedEventId.Value, userId);
-                            if (!result)
-                            {
-                                var userName = users.FirstOrDefault(u => (long)u.userId == userId)?.name ?? "Unknown User";
-                                failedUsers.Add(userName);
-                                continue;
-                            }
-                        }
-
-                        await _parent._commandsModule.UpdateEvents();
-
-                        // Format response based on results
-                        if (failedUsers.Count == 0 && failedUsersDb.Count == 0)
-                        {
-                            await ctx.EditFollowupAsync(userSelectResponseMsg.Id, new DiscordWebhookBuilder()
-                                .WithContent($"✅ Attendance has been successfully removed for all {selectedUserIds.Count} selected users."));
-
-                            _parent._logger.LogInformation($"User {ctx.User.Id} removed attendance for {selectedUserIds.Count} selected users from event {selectedEventId.Value}");
-                        }
-                        else
-                        {
-                            var finalResponse = new StringBuilder();
-                            finalResponse.AppendLine($"⚠️ Results of attendance removal operation:");
-                            finalResponse.AppendLine($"• Successfully processed: {selectedUserIds.Count - (failedUsers.Count + failedUsersDb.Count)} users");
-
-                            if (failedUsers.Count > 0)
-                            {
-                                finalResponse.AppendLine($"\n❌ Failed to remove from RaidHelper ({failedUsers.Count}):");
-                                finalResponse.AppendLine(string.Join(", ", failedUsers));
-                            }
-
-                            if (failedUsersDb.Count > 0)
-                            {
-                                finalResponse.AppendLine($"\n❌ Failed to remove from database ({failedUsersDb.Count}):");
-                                finalResponse.AppendLine(string.Join(", ", failedUsersDb));
-                            }
-
-                            await ctx.EditFollowupAsync(userSelectResponseMsg.Id, new DiscordWebhookBuilder()
-                                .WithContent(finalResponse.ToString()));
-
-                            _parent._logger.LogWarning($"User {ctx.User.Id} had partial failures removing selected attendance: {failedUsers.Count} RaidHelper failures, {failedUsersDb.Count} DB failures");
-                        }
+                        await HandleSelectUsers(ctx, actionMsg, users, selectedEventId.Value);
                     }
-                    else if (buttonResult.Result.Id == "cancel_remove_attendance")
+                    else if (buttonResult.Result.Id == "cancel_attendance")
                     {
-                        await ctx.EditFollowupAsync(responseMsg.Id, new DiscordWebhookBuilder()
-                            .WithContent("Operation canceled. No changes were made."));
-
-                        _parent._logger.LogInformation($"User {ctx.User.Id} canceled attendance removal operation");
+                        await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                            .WithContent("❌ Operation canceled. No changes were made."));
+                        _parent._logger.LogInformation($"User {ctx.User.Id} canceled attendance removal");
                     }
                 }
                 catch (Exception ex)
@@ -891,6 +733,7 @@ namespace QutieBot.Bot.Commands
                     await ctx.RespondAsync("An error occurred while checking attendees. Please try again later.");
                 }
             }
+
 
             [Command("signups"), Description("List users who haven't signed up for an event")]
             [RequirePermissions(DiscordPermissions.ModerateMembers)]
@@ -1259,6 +1102,277 @@ namespace QutieBot.Bot.Commands
                     await ctx.RespondAsync("An error occurred while sending notifications. Please try again later.");
                 }
             }
+
+
+            private async Task HandleRemoveAllAttendance(
+                CommandContext ctx,
+                DiscordMessage actionMsg,
+                List<SignUpData> users,
+                long eventId)
+            {
+                await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                    .WithContent($"⏳ Processing removal for all {users.Count} users..."));
+
+                var failedUsers = new List<string>();
+                var successUserIds = new List<long>();
+
+                foreach (var user in users)
+                {
+                    var result = await _parent._commandsModule.RemoveAttendance(eventId, (long)user.userId);
+                    if (!result)
+                    {
+                        failedUsers.Add(user.name);
+                    }
+                    else
+                    {
+                        successUserIds.Add((long)user.userId);
+                    }
+                }
+
+                await _parent._commandsModule.UpdateEvents();
+
+                // Bulk update Google Sheets for all successful removals
+                if (successUserIds.Count > 0)
+                {
+                    var eventData = await _parent._commandsDAL.GetEventWithChannel(eventId);
+                    await _parent._googleSheetsFacade.ProcessBulkEventSignupsAsync(successUserIds, eventData, false);
+                }
+
+                // Send final result as a new followup message
+                if (failedUsers.Count == 0)
+                {
+                    await ctx.FollowupAsync(new DiscordFollowupMessageBuilder()
+                        .WithContent($"✅ Successfully removed attendance for all {users.Count} users."));
+
+                    _parent._logger.LogInformation($"User {ctx.User.Id} removed attendance for all {users.Count} users from event {eventId}");
+                }
+                else
+                {
+                    var resultMsg = new StringBuilder();
+                    resultMsg.AppendLine($"⚠️ **Removal Results:**");
+                    resultMsg.AppendLine($"✅ Successfully removed: {users.Count - failedUsers.Count}");
+                    resultMsg.AppendLine($"❌ Failed to remove: {failedUsers.Count}");
+                    resultMsg.AppendLine($"\nFailed users: {string.Join(", ", failedUsers)}");
+
+                    await ctx.FollowupAsync(new DiscordFollowupMessageBuilder()
+                        .WithContent(resultMsg.ToString()));
+
+                    _parent._logger.LogWarning($"User {ctx.User.Id} had {failedUsers.Count} failures removing attendance from event {eventId}");
+                }
+
+                // Clean up the action message
+                await actionMsg.DeleteAsync();
+            }
+
+            private async Task HandleSelectUsers(
+                CommandContext ctx,
+                DiscordMessage actionMsg,
+                List<SignUpData> users,
+                long eventId)
+            {
+                const int USERS_PER_PAGE = 20;
+                int currentPage = 0;
+                int totalPages = (int)Math.Ceiling(users.Count / (double)USERS_PER_PAGE);
+                var selectedUserIds = new HashSet<long>();
+
+                while (true)
+                {
+                    // Get users for current page
+                    var pageUsers = users
+                        .Skip(currentPage * USERS_PER_PAGE)
+                        .Take(USERS_PER_PAGE)
+                        .ToList();
+
+                    // Build select menu for current page
+                    var selectOptions = pageUsers
+                        .Select(u => new DiscordSelectComponentOption(u.name, u.userId.ToString()))
+                        .ToList();
+
+                    var userSelectMenu = new DiscordSelectComponent(
+                        "user_select",
+                        "Select users to remove",
+                        selectOptions,
+                        minOptions: 0,
+                        maxOptions: selectOptions.Count);
+
+                    // Build pagination buttons
+                    var components = new List<DiscordComponent> { userSelectMenu };
+
+                    var buttonRow = new List<DiscordButtonComponent>();
+
+                    if (currentPage > 0)
+                    {
+                        buttonRow.Add(new DiscordButtonComponent(
+                            DiscordButtonStyle.Secondary,
+                            "prev_page",
+                            "◀️ Previous"));
+                    }
+
+                    buttonRow.Add(new DiscordButtonComponent(
+                        DiscordButtonStyle.Success,
+                        "confirm_selection",
+                        $"Confirm ({selectedUserIds.Count} selected)"));
+
+                    if (currentPage < totalPages - 1)
+                    {
+                        buttonRow.Add(new DiscordButtonComponent(
+                            DiscordButtonStyle.Secondary,
+                            "next_page",
+                            "Next ▶️"));
+                    }
+
+                    buttonRow.Add(new DiscordButtonComponent(
+                        DiscordButtonStyle.Danger,
+                        "cancel_selection",
+                        "Cancel"));
+
+                    // Update message with current page
+                    var pageContent = $"**Select users to remove (Page {currentPage + 1}/{totalPages})**\n";
+                    if (selectedUserIds.Count > 0)
+                    {
+                        pageContent += $"Currently selected: {selectedUserIds.Count} users\n";
+                    }
+
+                    await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                        .WithContent(pageContent)
+                        .AddComponents(userSelectMenu)
+                        .AddComponents(buttonRow));
+
+                    // Wait for interaction (either select or button)
+                    var interactionTask = actionMsg.WaitForSelectAsync(ctx.User, "user_select", TimeSpan.FromMinutes(2));
+                    var buttonTask = actionMsg.WaitForButtonAsync(ctx.User, TimeSpan.FromMinutes(2));
+
+                    var completedTask = await Task.WhenAny(interactionTask, buttonTask);
+
+                    if (completedTask == interactionTask)
+                    {
+                        var selectResult = await interactionTask;
+
+                        if (selectResult.TimedOut)
+                        {
+                            await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                                .WithContent("⏱️ Selection timed out. The user list above remains for your reference."));
+                            return;
+                        }
+
+                        // Add selected users to the set
+                        foreach (var value in selectResult.Result.Values)
+                        {
+                            selectedUserIds.Add(long.Parse(value));
+                        }
+
+                        await selectResult.Result.Interaction.CreateResponseAsync(
+                            DiscordInteractionResponseType.DeferredMessageUpdate);
+                    }
+                    else
+                    {
+                        var buttonResult = await buttonTask;
+
+                        if (buttonResult.TimedOut)
+                        {
+                            await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                                .WithContent("⏱️ Selection timed out. The user list above remains for your reference."));
+                            return;
+                        }
+
+                        await buttonResult.Result.Interaction.CreateResponseAsync(
+                            DiscordInteractionResponseType.DeferredMessageUpdate);
+
+                        if (buttonResult.Result.Id == "prev_page")
+                        {
+                            currentPage--;
+                        }
+                        else if (buttonResult.Result.Id == "next_page")
+                        {
+                            currentPage++;
+                        }
+                        else if (buttonResult.Result.Id == "confirm_selection")
+                        {
+                            if (selectedUserIds.Count == 0)
+                            {
+                                await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                                    .WithContent("⚠️ No users selected. Please select at least one user or cancel."));
+                                continue;
+                            }
+
+                            // Process the removal
+                            await ProcessSelectedUserRemoval(ctx, actionMsg, selectedUserIds.ToList(), users, eventId);
+                            return;
+                        }
+                        else if (buttonResult.Result.Id == "cancel_selection")
+                        {
+                            await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                                .WithContent("❌ Selection canceled. No changes were made."));
+                            await Task.Delay(3000);
+                            await actionMsg.DeleteAsync();
+                            return;
+                        }
+                    }
+                }
+            }
+
+            private async Task ProcessSelectedUserRemoval(
+                CommandContext ctx,
+                DiscordMessage actionMsg,
+                List<long> selectedUserIds,
+                List<SignUpData> allUsers,
+                long eventId)
+            {
+                await actionMsg.ModifyAsync(new DiscordMessageBuilder()
+                    .WithContent($"⏳ Processing removal for {selectedUserIds.Count} selected users..."));
+
+                var failedUsers = new List<string>();
+                var successUserIds = new List<long>();
+
+                foreach (var userId in selectedUserIds)
+                {
+                    var result = await _parent._commandsModule.RemoveAttendance(eventId, userId);
+                    if (!result)
+                    {
+                        var userName = allUsers.FirstOrDefault(u => (long)u.userId == userId)?.name ?? "Unknown User";
+                        failedUsers.Add(userName);
+                    }
+                    else
+                    {
+                        successUserIds.Add(userId);
+                    }
+                }
+
+                await _parent._commandsModule.UpdateEvents();
+
+                // Bulk update Google Sheets for all successful removals
+                if (successUserIds.Count > 0)
+                {
+                    var eventData = await _parent._commandsDAL.GetEventWithChannel(eventId);
+                    await _parent._googleSheetsFacade.ProcessBulkEventSignupsAsync(successUserIds, eventData, false);
+                }
+
+                // Send result as new followup
+                if (failedUsers.Count == 0)
+                {
+                    await ctx.FollowupAsync(new DiscordFollowupMessageBuilder()
+                        .WithContent($"✅ Successfully removed attendance for {selectedUserIds.Count} selected users."));
+
+                    _parent._logger.LogInformation($"User {ctx.User.Id} removed attendance for {selectedUserIds.Count} users from event {eventId}");
+                }
+                else
+                {
+                    var resultMsg = new StringBuilder();
+                    resultMsg.AppendLine($"⚠️ **Removal Results:**");
+                    resultMsg.AppendLine($"✅ Successfully removed: {selectedUserIds.Count - failedUsers.Count}");
+                    resultMsg.AppendLine($"❌ Failed to remove: {failedUsers.Count}");
+                    resultMsg.AppendLine($"\nFailed users: {string.Join(", ", failedUsers)}");
+
+                    await ctx.FollowupAsync(new DiscordFollowupMessageBuilder()
+                        .WithContent(resultMsg.ToString()));
+
+                    _parent._logger.LogWarning($"User {ctx.User.Id} had {failedUsers.Count} failures removing selected users from event {eventId}");
+                }
+
+                // Clean up action message
+                await actionMsg.DeleteAsync();
+            }
+
         }
 
 

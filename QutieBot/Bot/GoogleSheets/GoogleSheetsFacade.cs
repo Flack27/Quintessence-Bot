@@ -1,8 +1,10 @@
 ﻿using DSharpPlus.EventArgs;
+using Google.Apis.Sheets.v4.Data;
 using Microsoft.Extensions.Logging;
 using QutieBot.Bot.GoogleSheets;
 using QutieDAL.DAL;
 using QutieDTO.Models;
+using System.Linq;
 
 public class GoogleSheetsFacade
 {
@@ -56,6 +58,55 @@ public class GoogleSheetsFacade
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during full data synchronization");
+        }
+    }
+
+    public async Task ProcessBulkEventSignupsAsync(List<long> userIds, Event evt, bool isSignedUp)
+    {
+        if (evt == null || evt.Channel == null)
+        {
+            _logger.LogWarning($"Cannot process bulk event signups with null event or channel");
+            return;
+        }
+
+        _logger.LogInformation($"Processing bulk event signup for {userIds.Count} users in event {evt.EventId}, signed up: {isSignedUp}");
+
+        try
+        {
+            // Manually adjust the event's signup list to reflect the changes
+            if (isSignedUp)
+            {
+                // Adding users - ensure they're in the signup list
+                foreach (var userId in userIds)
+                {
+                    if (!evt.EventSignups.Any(s => s.UserId == userId))
+                    {
+                        evt.EventSignups.Add(new EventSignup { UserId = userId, EventId = evt.EventId });
+                    }
+                }
+            }
+            else
+            {
+                // Removing users - filter out the ones we're removing
+                evt.EventSignups = evt.EventSignups
+                    .Where(s => !userIds.Contains(s.UserId))
+                    .ToList();
+            }
+
+            // Use the bulk prepare method to build updates for ALL users
+            var requests = await _attendanceService.PrepareAttendanceRequestsAsync(evt, evt.Channel);
+
+            if (requests.Count > 0)
+            {
+                var batchUpdateRequest = new BatchUpdateSpreadsheetRequest { Requests = requests };
+                await _attendanceService.ExecuteBulkAttendanceUpdateAsync(evt.Channel.Game.SheetId, batchUpdateRequest);
+
+                _logger.LogInformation($"Successfully processed bulk signup for {userIds.Count} users in event {evt.EventId}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error processing bulk event signup in event {evt.EventId}");
         }
     }
 
