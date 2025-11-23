@@ -154,13 +154,21 @@ namespace QutieBot.Bot.Commands.Games
                 Timestamp = System.DateTime.UtcNow
             };
 
+            // Get the updated data to show complete profile
+            var updatedData = await _dal.GetAionDataAsync(ctx.User.Id);
+            if (updatedData == null)
+            {
+                await ctx.RespondAsync("Failed to retrieve updated profile. Please try again.");
+                return;
+            }
+
             var details = new StringBuilder();
-            details.AppendLine($"**Character:** {name}");
-            details.AppendLine($"**Gearscore:** {gearscore}");
+            details.AppendLine($"**Character:** {updatedData.IGN ?? "Not set"}");
+            details.AppendLine($"**Gearscore:** {updatedData.Gearscore?.ToString() ?? "Not set"}");
             details.AppendLine($"**Roster:** {roster?.Name ?? "None"}");
             details.AppendLine();
-            details.AppendLine($"**Class:** {@class}");
-            details.AppendLine($"**Role:** {role}");
+            details.AppendLine($"**Class:** {updatedData.Class ?? "Not set"}");
+            details.AppendLine($"**Role:** {updatedData.Role ?? "Not set"}");
 
             embed.AddField("Profile Details", details.ToString());
 

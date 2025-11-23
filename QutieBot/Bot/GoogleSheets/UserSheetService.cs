@@ -145,7 +145,9 @@ namespace QutieBot.Bot.GoogleSheets
                 if (rowsToAdd.Any())
                 {
                     _logger.LogInformation($"Adding {rowsToAdd.Count} new users for game: {game.GameName}");
-                    string addRange = $"{_startColumn}{_startRow + (existingValues?.Count ?? 0)}:{_startColumn}";
+                    // Calculate actual last row after deletions
+                    int remainingUserCount = existingUserIds.Count - usersToDelete.Count;
+                    string addRange = $"{_startColumn}{_startRow + remainingUserCount}:{_startColumn}";
                     var addValueRange = new ValueRange { Values = rowsToAdd };
 
                     var appendRequest = _service.Spreadsheets.Values.Append(addValueRange, game.SheetId, addRange);
