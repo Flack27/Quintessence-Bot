@@ -110,7 +110,7 @@ namespace QutieBot.Bot.Commands.Games
         [Command("char"), Description("Update your Where Winds Meet character details")]
         public async Task UpdateWwmData(CommandContext ctx,
                     [Description("Your character name")] string? name = null,
-                    [Description("Your gearscore")] int? level = null,
+                    [Description("Your gearscore")] int? gearscore = null,
                     [Description("Your primary weapon"), SlashChoiceProvider<PrimaryWeaponProvider>] string? primary = null,
                     [Description("Your secondary weapon"), SlashChoiceProvider<SecondaryWeaponProvider>] string? secondary = null,
                     [Description("Your preferred role"), SlashChoiceProvider<RoleProvider>] string? role = null,
@@ -123,7 +123,7 @@ namespace QutieBot.Bot.Commands.Games
                 UserId = (long)ctx.User.Id,
                 GameId = GameId,
                 IGN = name,
-                Level = level,
+                Level = gearscore,
                 PrimaryWeapon = primary,
                 SecondaryWeapon = secondary,
                 Role = role,
