@@ -139,13 +139,15 @@ namespace QutieDAL.DAL
 
                 using var context = _contextFactory.CreateDbContext();
 
+                _logger.LogInformation($"Checking for existing: Channel={channelId}, Message={messageId}, Name='{emojiName}', Id={emojiId}");
+
                 // Check if this reaction role already exists
                 var existingReactionRole = await context.ReactionRoles
                     .FirstOrDefaultAsync(r =>
                         r.ChannelId == channelId &&
                         r.MessageId == messageId &&
-                        r.EmojiName == emojiName &&
-                        r.EmojiId == emojiId);
+                        r.EmojiId == emojiId &&
+                        EF.Functions.Collate(r.EmojiName, "Latin1_General_BIN2") == EF.Functions.Collate(emojiName, "Latin1_General_BIN2"));
 
                 if (existingReactionRole != null)
                 {
@@ -153,7 +155,7 @@ namespace QutieDAL.DAL
                     existingReactionRole.RoleId = roleId;
                     context.ReactionRoles.Update(existingReactionRole);
 
-                    _logger.LogInformation($"Updated existing reaction role (ID: {existingReactionRole.Id}) with new role {roleId}");
+                    _logger.LogInformation($"Found match: ID={existingReactionRole.Id}, Name='{existingReactionRole.EmojiName}', EmojiId={existingReactionRole.EmojiId}");
                 }
                 else
                 {
@@ -197,8 +199,8 @@ namespace QutieDAL.DAL
                     .FirstOrDefaultAsync(r =>
                         r.ChannelId == channelId &&
                         r.MessageId == messageId &&
-                        r.EmojiName == emojiName &&
-                        r.EmojiId == emojiId);
+                        r.EmojiId == emojiId &&
+                        EF.Functions.Collate(r.EmojiName, "Latin1_General_BIN2") == EF.Functions.Collate(emojiName, "Latin1_General_BIN2"));
 
                 if (reactionRole == null)
                 {
@@ -234,8 +236,8 @@ namespace QutieDAL.DAL
                     .FirstOrDefaultAsync(r =>
                         r.ChannelId == channelId &&
                         r.MessageId == messageId &&
-                        r.EmojiName == emojiName &&
-                        r.EmojiId == emojiId);
+                        r.EmojiId == emojiId &&
+                        EF.Functions.Collate(r.EmojiName, "Latin1_General_BIN2") == EF.Functions.Collate(emojiName, "Latin1_General_BIN2"));
 
                 if (reactionRole != null)
                 {
