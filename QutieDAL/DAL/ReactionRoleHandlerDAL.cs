@@ -36,8 +36,8 @@ namespace QutieDAL.DAL
                     .FirstOrDefaultAsync(r =>
                         r.ChannelId == channelId &&
                         r.MessageId == messageId &&
-                        r.EmojiName == emojiName &&
-                        r.EmojiId == emojiId);
+                        r.EmojiId == emojiId &&
+                        EF.Functions.Collate(r.EmojiName, "Latin1_General_BIN2") == EF.Functions.Collate(emojiName, "Latin1_General_BIN2"));
 
                 if (reactionRole != null)
                 {
