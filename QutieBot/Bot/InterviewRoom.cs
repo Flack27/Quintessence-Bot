@@ -3,6 +3,7 @@ using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
 using Microsoft.Extensions.Logging;
 using QutieDAL.DAL;
+using QutieDTO.Models;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -21,6 +22,7 @@ namespace QutieBot.Bot
 
         // Dependencies
         private readonly DiscordClient _client;
+        private StateManager _stateManager;
         private readonly ILogger<InterviewRoom> _logger;
         private readonly DiscordInfoSaverDAL _discordInfoSaverDAL;
         private InterviewFollowUpService _followUpService;
@@ -36,6 +38,7 @@ namespace QutieBot.Bot
             ILogger<InterviewRoom> logger,
             DiscordInfoSaverDAL discordInfoSaverDAL,
             InterviewFollowUpService followUpService,
+            StateManager stateManager,
             ulong categoryId = 1308761605105909790,
             ulong adminRoleId = 1152617541190041600)
         {
@@ -45,11 +48,63 @@ namespace QutieBot.Bot
             _adminRoleId = adminRoleId;
             _discordInfoSaverDAL = discordInfoSaverDAL;
             _followUpService = followUpService;
+            _stateManager = stateManager;
             followUpService.SetInterviewRoom(this);
+
+            // Load persisted state
+            var savedInterviews = _stateManager.GetActiveInterviews();
+            foreach (var (userId, interview) in savedInterviews)
+            {
+                _activeInterviews[userId] = new InterviewData
+                {
+                    UserId = interview.UserId,
+                    ChannelId = interview.ChannelId,
+                    SubmissionId = interview.SubmissionId,
+                    CreatedAt = interview.CreatedAt
+                };
+            }
 
             _logger.LogInformation($"InterviewRoom initialized with category {_categoryId} and admin role {_adminRoleId}");
         }
 
+        /// <summary>
+        /// Validates that persisted interview channels still exist on Discord
+        /// </summary>
+        public async Task ValidateActiveInterviewsAsync(DiscordClient client)
+        {
+            try
+            {
+                var toRemove = new List<ulong>();
+
+                foreach (var (userId, interview) in _activeInterviews)
+                {
+                    try
+                    {
+                        var channel = await client.GetChannelAsync(interview.ChannelId);
+                        if (channel == null)
+                        {
+                            toRemove.Add(userId);
+                        }
+                    }
+                    catch
+                    {
+                        // Channel doesn't exist anymore
+                        toRemove.Add(userId);
+                    }
+                }
+
+                foreach (var userId in toRemove)
+                {
+                    _activeInterviews.Remove(userId);
+                    _stateManager.RemoveActiveInterview(userId);
+                    _logger.LogInformation($"Removed stale interview for user {userId} from tracking");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating active interviews");
+            }
+        }
 
         /// <summary>
         /// Creates a new interview room for a user
@@ -204,6 +259,13 @@ namespace QutieBot.Bot
                 };
                 _activeInterviews[userId] = interviewData;
 
+                _stateManager.UpdateActiveInterview(userId, new InterviewDataState
+                {
+                    ChannelId = interviewChannel.Id,
+                    SubmissionId = submissionId,
+                    CreatedAt = interviewData.CreatedAt
+                });
+
                 // Send welcome message
                 await SendWelcomeMessageAsync(interviewChannel, user, adminRole);
 
@@ -266,6 +328,7 @@ namespace QutieBot.Bot
                 {
                     await _discordInfoSaverDAL.UpdateDatabaseForUserLeft(userId, interviewData.SubmissionId);
                     _activeInterviews.Remove(userId);
+                    _stateManager.RemoveActiveInterview(userId);
                     _logger.LogInformation($"Cleaned up interview data for user {userId} after timeout");
                 }
             }
@@ -317,6 +380,7 @@ namespace QutieBot.Bot
                         return;
                     }
 
+
                     // Create a notification embed
                     var notificationEmbed = new DiscordEmbedBuilder()
                         .WithTitle("⚠️ User Left Server")
@@ -342,6 +406,7 @@ namespace QutieBot.Bot
 
                     await channel.SendMessageAsync(messageBuilder);
                     _activeInterviews.Remove(userId);
+                    _stateManager.RemoveActiveInterview(userId);
                 }
             }
             catch (Exception ex)
@@ -483,6 +548,7 @@ namespace QutieBot.Bot
             foreach (var entry in _activeInterviews.Where(kvp => kvp.Value.ChannelId == channelId).ToList())
             {
                 _activeInterviews.Remove(entry.Key);
+                _stateManager.RemoveActiveInterview(entry.Key);
                 _logger.LogInformation($"Removed user {entry.Key} from active interviews");
             }
 
@@ -530,6 +596,7 @@ namespace QutieBot.Bot
             foreach (var entry in _activeInterviews.Where(kvp => kvp.Value.ChannelId == channelId).ToList())
             {
                 _activeInterviews.Remove(entry.Key);
+                _stateManager.RemoveActiveInterview(entry.Key);
             }
         }
 
@@ -602,6 +669,7 @@ namespace QutieBot.Bot
             foreach (var entry in _activeInterviews.Where(kvp => kvp.Value.ChannelId == channelId).ToList())
             {
                 _activeInterviews.Remove(entry.Key);
+                _stateManager.RemoveActiveInterview(entry.Key);
             }
         }
 

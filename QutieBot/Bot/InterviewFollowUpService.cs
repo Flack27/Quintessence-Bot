@@ -192,7 +192,18 @@ namespace QutieBot.Bot
                 if (_activeTimers.TryGetValue(channelId, out var timer))
                 {
                     timer.IsPaused = true;
-                    
+
+                    _stateManager.UpdateInterviewTimer(channelId, new InterviewTimerState
+                    {
+                        ChannelId = timer.ChannelId,
+                        UserId = timer.UserId,
+                        AdminId = timer.AdminId,
+                        StartTime = timer.StartTime,
+                        FirstWarningSentAt = timer.FirstWarningSentAt,
+                        Stage = timer.Stage,
+                        IsPaused = timer.IsPaused
+                    });
+
                     // Cancel the running timer
                     if (_cancellationTokens.ContainsKey(channelId))
                     {
@@ -236,7 +247,18 @@ namespace QutieBot.Bot
                 {
                     // Add 24 hours to the timer by updating the start time
                     timer.StartTime = timer.StartTime.AddHours(24);
-                    
+
+                    _stateManager.UpdateInterviewTimer(channelId, new InterviewTimerState
+                    {
+                        ChannelId = timer.ChannelId,
+                        UserId = timer.UserId,
+                        AdminId = timer.AdminId,
+                        StartTime = timer.StartTime,
+                        FirstWarningSentAt = timer.FirstWarningSentAt,
+                        Stage = timer.Stage,
+                        IsPaused = timer.IsPaused
+                    });
+
                     _logger.LogInformation($"Timer extended by 24 hours for channel {channelId} by admin {e.User.Id}");
 
                     await e.Interaction.CreateResponseAsync(
@@ -271,7 +293,18 @@ namespace QutieBot.Bot
                 if (_activeTimers.TryGetValue(channelId, out var timer) && timer.IsPaused)
                 {
                     timer.IsPaused = false;
-                    
+
+                    _stateManager.UpdateInterviewTimer(channelId, new InterviewTimerState
+                    {
+                        ChannelId = timer.ChannelId,
+                        UserId = timer.UserId,
+                        AdminId = timer.AdminId,
+                        StartTime = timer.StartTime,
+                        FirstWarningSentAt = timer.FirstWarningSentAt,
+                        Stage = timer.Stage,
+                        IsPaused = timer.IsPaused
+                    });
+
                     _logger.LogInformation($"Timer resumed for channel {channelId} by admin {e.User.Id}");
 
                     await e.Interaction.CreateResponseAsync(

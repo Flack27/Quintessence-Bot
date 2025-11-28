@@ -374,13 +374,16 @@ namespace QutieBot
             {
                 _logger.LogInformation($"Guild available: {e.Guild.Name} ({e.Guild.Id})");
 
+                await _discordInfoSaver.Client_GuildAvailable(client, e);
+
                 // Restore state (only run once)
                 if (!_stateRestored)
                 {
                     _stateRestored = true;
-                    await _discordInfoSaver.Client_GuildAvailable(client, e);
                     await _interviewFollowUpService.RestoreTimersAsync(client);
                     await _userVoiceXPCounter.InitializeFromState();
+                    await _joinToCreateChannelBot.ValidateCreatedChannelsAsync(client);
+                    await _interviewRoom.ValidateActiveInterviewsAsync(client);
                     _logger.LogInformation("Bot state restored from persistence");
                 }
             }
