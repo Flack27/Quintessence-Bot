@@ -134,32 +134,68 @@ namespace QutieBot.Bot.GoogleSheets
                     rowsToAdd.Add(newRow);
                 }
 
-                // Execute update requests for existing users
-                if (batchUpdateRequest.Requests.Any())
+                // 1. Delete users first (prevents row index conflicts)
+                if (usersToDelete.Any())
                 {
-                    _logger.LogInformation($"Updating {batchUpdateRequest.Requests.Count} existing users for game: {game.GameName}");
-                    await _service.Spreadsheets.BatchUpdate(batchUpdateRequest, game.SheetId).ExecuteAsync();
+                    _logger.LogInformation($"Deleting {usersToDelete.Count} users no longer in role for game: {game.GameName}");
+                    await DeleteUsersFromSheet(game.SheetId, usersToDelete, existingUserIds);
                 }
 
-                // Add new users
+                // 2. Re-fetch data after deletions to get correct row indices
+                var refreshedResponse = await GetRangeValuesAsync(game.SheetId, dataRange);
+                var refreshedValues = refreshedResponse.Values;
+                var refreshedUserIds = new Dictionary<long, int>();
+                if (refreshedValues != null)
+                {
+                    for (int i = 0; i < refreshedValues.Count; i++)
+                    {
+                        if (refreshedValues[i].Count > 0 && long.TryParse(refreshedValues[i][0].ToString(), out var existingId))
+                        {
+                            refreshedUserIds[existingId] = _startRow + i;
+                        }
+                    }
+                }
+
+                // 3. Rebuild update requests with correct row indices
+                var refreshedBatchRequest = new BatchUpdateSpreadsheetRequest
+                {
+                    Requests = new List<Request>()
+                };
+
+                foreach (var userId in userIds.Where(id => refreshedUserIds.ContainsKey(id)))
+                {
+                    var userData = await _dal.GetUserGameData(userId, game.GameId);
+                    if (userData == null) continue;
+
+                    int rowIndex = refreshedUserIds[userId];
+                    var updateRequest = CreateUpdateCellsRequest(
+                        game.SheetId,
+                        rowIndex - 1,
+                        rowIndex,
+                        _startColumn[0] - 'A',
+                        PrepareUserRowData(userId, userData));
+
+                    refreshedBatchRequest.Requests.Add(updateRequest);
+                }
+
+                // 4. Execute updates
+                if (refreshedBatchRequest.Requests.Any())
+                {
+                    _logger.LogInformation($"Updating {refreshedBatchRequest.Requests.Count} existing users for game: {game.GameName}");
+                    await _service.Spreadsheets.BatchUpdate(refreshedBatchRequest, game.SheetId).ExecuteAsync();
+                }
+
+                // 5. Add new users at the end
                 if (rowsToAdd.Any())
                 {
                     _logger.LogInformation($"Adding {rowsToAdd.Count} new users for game: {game.GameName}");
-                    // Calculate actual last row after deletions
-                    int remainingUserCount = existingUserIds.Count - usersToDelete.Count;
-                    string addRange = $"{_startColumn}{_startRow + remainingUserCount}:{_startColumn}";
+                    int currentUserCount = refreshedValues?.Count ?? 0;
+                    string addRange = $"{_startColumn}{_startRow + currentUserCount}:{_startColumn}";
                     var addValueRange = new ValueRange { Values = rowsToAdd };
 
                     var appendRequest = _service.Spreadsheets.Values.Append(addValueRange, game.SheetId, addRange);
                     appendRequest.ValueInputOption = SpreadsheetsResource.ValuesResource.AppendRequest.ValueInputOptionEnum.USERENTERED;
                     await appendRequest.ExecuteAsync();
-                }
-
-                // Delete users not in the role
-                if (usersToDelete.Any())
-                {
-                    _logger.LogInformation($"Deleting {usersToDelete.Count} users no longer in role for game: {game.GameName}");
-                    await DeleteUsersFromSheet(game.SheetId, usersToDelete, existingUserIds);
                 }
 
                 // Notify users with missing data
@@ -646,30 +682,69 @@ namespace QutieBot.Bot.GoogleSheets
                     rowsToAdd.Add(newRow);
                 }
 
-                // Execute update requests for existing users
-                if (batchUpdateRequest.Requests.Any())
+                // 1. Delete users first
+                if (usersToDelete.Any())
                 {
-                    _logger.LogInformation($"Updating {batchUpdateRequest.Requests.Count} existing users for channel: {channel.ChannelName}");
-                    await _service.Spreadsheets.BatchUpdate(batchUpdateRequest, channel.Game.SheetId).ExecuteAsync();
+                    _logger.LogInformation($"Deleting users no longer in role for channel: {channel.ChannelName}");
+                    await DeleteChannelUsersFromSheet(channel.Game.SheetId, tabId, usersToDelete, existingUserIds);
                 }
 
-                // Add new users
+                // 2. Re-fetch data after deletions
+                string refreshDataRange = $"{channel.ChannelName}!{_startColumn}{_startRow}:{_startColumn}";
+                var refreshedResponse = await GetRangeValuesAsync(channel.Game.SheetId, refreshDataRange);
+                var refreshedValues = refreshedResponse.Values;
+                var refreshedUserIds = new Dictionary<long, int>();
+                if (refreshedValues != null)
+                {
+                    for (int i = 0; i < refreshedValues.Count; i++)
+                    {
+                        if (refreshedValues[i].Count > 0 && long.TryParse(refreshedValues[i][0].ToString(), out var existingId))
+                        {
+                            refreshedUserIds[existingId] = _startRow + i;
+                        }
+                    }
+                }
+
+                // 3. Rebuild update requests with correct row indices
+                var refreshedBatchRequest = new BatchUpdateSpreadsheetRequest
+                {
+                    Requests = new List<Request>()
+                };
+
+                foreach (var userId in userIds.Where(id => refreshedUserIds.ContainsKey(id)))
+                {
+                    var userData = await _dal.GetUserChannelData(userId, channel.ChannelId);
+                    if (userData == null) continue;
+
+                    int rowIndex = refreshedUserIds[userId];
+                    var updateRequest = CreateUpdateCellsRequest(
+                        tabId.ToString(),
+                        rowIndex - 1,
+                        rowIndex,
+                        _startColumn[0] - 'A',
+                        PrepareUserRowData(userId, userData));
+
+                    refreshedBatchRequest.Requests.Add(updateRequest);
+                }
+
+                // 4. Execute updates
+                if (refreshedBatchRequest.Requests.Any())
+                {
+                    _logger.LogInformation($"Updating {refreshedBatchRequest.Requests.Count} existing users for channel: {channel.ChannelName}");
+                    await _service.Spreadsheets.BatchUpdate(refreshedBatchRequest, channel.Game.SheetId).ExecuteAsync();
+                }
+
+                // 5. Add new users at the end
                 if (rowsToAdd.Any())
                 {
                     _logger.LogInformation($"Adding {rowsToAdd.Count} new users for channel: {channel.ChannelName}");
-                    string addRange = $"{channel.ChannelName}!{_startColumn}{_startRow + (existingValues?.Count ?? 0)}:{_startColumn}";
+                    int currentUserCount = refreshedValues?.Count ?? 0;
+                    string addRange = $"{channel.ChannelName}!{_startColumn}{_startRow + currentUserCount}:{_startColumn}";
                     var addValueRange = new ValueRange { Values = rowsToAdd };
 
                     var appendRequest = _service.Spreadsheets.Values.Append(addValueRange, channel.Game.SheetId, addRange);
                     appendRequest.ValueInputOption = SpreadsheetsResource.ValuesResource.AppendRequest.ValueInputOptionEnum.USERENTERED;
                     await appendRequest.ExecuteAsync();
-                }
-
-                // Delete users not in the role
-                if (usersToDelete.Any())
-                {
-                    _logger.LogInformation($"Deleting users no longer in role for channel: {channel.ChannelName}");
-                    await DeleteChannelUsersFromSheet(channel.Game.SheetId, tabId, usersToDelete, existingUserIds);
                 }
 
                 _logger.LogInformation($"User sync completed for channel: {channel.ChannelName}");
