@@ -18,6 +18,7 @@ namespace QutieBot.Bot
     public class InterviewFollowUpService
     {
         private readonly ILogger<InterviewFollowUpService> _logger;
+        private readonly StateManager _stateManager;
         private readonly ulong _adminRoleId;
         private readonly ConcurrentDictionary<ulong, InterviewTimer> _activeTimers;
         private readonly Dictionary<ulong, CancellationTokenSource> _cancellationTokens;
@@ -30,12 +31,13 @@ namespace QutieBot.Bot
         /// <summary>
         /// Initializes a new instance of the InterviewFollowUpService
         /// </summary>
-        public InterviewFollowUpService(ILogger<InterviewFollowUpService> logger)
+        public InterviewFollowUpService(ILogger<InterviewFollowUpService> logger, StateManager stateManager)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _adminRoleId = 1152617541190041600;
             _activeTimers = new ConcurrentDictionary<ulong, InterviewTimer>();
             _cancellationTokens = new Dictionary<ulong, CancellationTokenSource>();
+            _stateManager = stateManager;
         }
 
         /// <summary>
@@ -45,6 +47,48 @@ namespace QutieBot.Bot
         {
             _interviewRoom = interviewRoom ?? throw new ArgumentNullException(nameof(interviewRoom));
         }
+
+
+        public async Task RestoreTimersAsync(DiscordClient client)
+        {
+            var savedTimers = _stateManager.GetInterviewTimers();
+            foreach (var (channelId, timerState) in savedTimers)
+            {
+                try
+                {
+                    var channel = await client.GetChannelAsync(channelId);
+                    if (channel == null) continue;
+
+                    var timer = new InterviewTimer
+                    {
+                        ChannelId = timerState.ChannelId,
+                        UserId = timerState.UserId,
+                        AdminId = timerState.AdminId,
+                        StartTime = timerState.StartTime,
+                        FirstWarningSentAt = timerState.FirstWarningSentAt,
+                        Stage = timerState.Stage,
+                        IsPaused = timerState.IsPaused
+                    };
+
+                    _activeTimers[channelId] = timer;
+
+                    if (!timer.IsPaused)
+                    {
+                        // Restart the timer task
+                        var cts = new CancellationTokenSource();
+                        _cancellationTokens[channelId] = cts;
+                        _ = Task.Run(() => RunTimerAsync(client, channel, timer, cts.Token));
+                    }
+
+                    _logger.LogInformation($"Restored interview timer for channel {channelId}");
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, $"Failed to restore timer for channel {channelId}");
+                }
+            }
+        }
+
 
         /// <summary>
         /// Handles message creation in interview channels
@@ -291,6 +335,17 @@ namespace QutieBot.Bot
 
                 _activeTimers[channelId] = timer;
 
+                _stateManager.UpdateInterviewTimer(channelId, new InterviewTimerState
+                {
+                    ChannelId = timer.ChannelId,
+                    UserId = timer.UserId,
+                    AdminId = timer.AdminId,
+                    StartTime = timer.StartTime,
+                    FirstWarningSentAt = timer.FirstWarningSentAt,
+                    Stage = timer.Stage,
+                    IsPaused = timer.IsPaused
+                });
+
                 // Create cancellation token
                 var cts = new CancellationTokenSource();
                 _cancellationTokens[channelId] = cts;
@@ -339,6 +394,7 @@ namespace QutieBot.Bot
                     _cancellationTokens[channelId].Dispose();
                     _cancellationTokens.Remove(channelId);
                     _activeTimers.TryRemove(channelId, out _);
+                    _stateManager.RemoveInterviewTimer(channelId);
                 }
             }
             finally

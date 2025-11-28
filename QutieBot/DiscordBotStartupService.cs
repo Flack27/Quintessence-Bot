@@ -1,5 +1,6 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
@@ -15,15 +16,18 @@ namespace QutieBot
     {
         private readonly DiscordClient _client;
         private readonly Webhook _webhook;
+        private readonly StateManager _stateManager;
         private readonly ILogger<DiscordBotStartupService> _logger;
 
         public DiscordBotStartupService(
             DiscordClient client,
             Webhook webhook,
+            StateManager stateManager,
             ILogger<DiscordBotStartupService> logger)
         {
             _client = client ?? throw new ArgumentNullException(nameof(client));
             _webhook = webhook ?? throw new ArgumentNullException(nameof(webhook));
+            _stateManager = stateManager ?? throw new ArgumentNullException(nameof(stateManager));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -36,6 +40,8 @@ namespace QutieBot
                 // Start the webhook service
                 _logger.LogInformation("Starting webhook service");
                 await _webhook.StartAsync(cancellationToken);
+
+                await _stateManager.InitializeAsync();
 
                 // Connect the Discord client
                 _logger.LogInformation("Connecting Discord client");

@@ -307,23 +307,22 @@ namespace QutieDAL.DAL
         }
 
 
-        public async Task UpdateUserVoiceActivity(ulong userId, decimal voiceMinutes, int xpEarned)
+        public async Task UpdateUserVoiceActivityForDate(ulong userId, decimal voiceMinutes, int xpEarned, DateTime date)
         {
             try
             {
-                var today = DateTime.UtcNow.Date; // Just get the date part
+                var targetDate = date.Date;
 
                 using var context = _contextFactory.CreateDbContext();
                 var summary = await context.UserVoiceActivitySummary
-                    .FirstOrDefaultAsync(s => s.UserId == (long)userId && s.Date == today);
+                    .FirstOrDefaultAsync(s => s.UserId == (long)userId && s.Date == targetDate);
 
                 if (summary == null)
                 {
-                    // Create new day record
                     summary = new UserVoiceActivitySummary
                     {
                         UserId = (long)userId,
-                        Date = today,
+                        Date = targetDate,
                         VoiceMinutes = voiceMinutes,
                         XpEarned = xpEarned
                     };
@@ -331,7 +330,6 @@ namespace QutieDAL.DAL
                 }
                 else
                 {
-                    // Update existing day record
                     summary.VoiceMinutes += voiceMinutes;
                     summary.XpEarned += xpEarned;
                 }
@@ -340,7 +338,7 @@ namespace QutieDAL.DAL
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error updating voice activity for user {userId}");
+                _logger.LogError(ex, $"Error updating voice activity for user {userId} on {date:yyyy-MM-dd}");
             }
         }
     }
