@@ -18,7 +18,6 @@ namespace QutieBot.Bot
         private readonly DiscordInfoSaverDAL _dal;
         private readonly GoogleSheetsFacade _sheets;
         private readonly ILogger<DiscordInfoSaver> _logger;
-        private bool _isLoopRunning = false;
 
         // Channel IDs for member count tracking
         private const ulong MemberCountChannelId = 1138138805380067391;

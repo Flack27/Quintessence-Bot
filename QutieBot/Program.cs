@@ -14,7 +14,6 @@ using System.Threading.Tasks;
 using DSharpPlus.Commands.Processors.TextCommands.Parsing;
 using DSharpPlus.Extensions;
 using QutieDAL.DAL;
-using QutieBot.Bot;
 using Microsoft.EntityFrameworkCore;
 using QutieDTO.Models;
 using Microsoft.Extensions.Hosting;
@@ -192,6 +191,8 @@ namespace QutieBot.Bot.Commands
             services.AddSingleton<AutoRoleManager>();
             services.AddSingleton<DmRelayService>();
             services.AddSingleton<InterviewFollowUpService>();
+            services.AddSingleton<StatePersistence>();
+            services.AddSingleton<StateManager>();
 
             // Background services
             services.AddHostedService<ScheduleMemberCountUpdateService>();

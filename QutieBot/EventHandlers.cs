@@ -43,6 +43,8 @@ namespace QutieBot
         private readonly InterviewFollowUpService _interviewFollowUpService;
         private readonly ILogger<EventHandlers> _logger;
 
+        private bool _stateRestored = false;
+
         /// <summary>
         /// Initializes a new instance of the EventHandlers class
         /// </summary>
@@ -371,7 +373,16 @@ namespace QutieBot
             try
             {
                 _logger.LogInformation($"Guild available: {e.Guild.Name} ({e.Guild.Id})");
-                await _discordInfoSaver.Client_GuildAvailable(client, e);
+
+                // Restore state (only run once)
+                if (!_stateRestored)
+                {
+                    _stateRestored = true;
+                    await _discordInfoSaver.Client_GuildAvailable(client, e);
+                    await _interviewFollowUpService.RestoreTimersAsync(client);
+                    await _userVoiceXPCounter.InitializeFromState();
+                    _logger.LogInformation("Bot state restored from persistence");
+                }
             }
             catch (Exception ex)
             {

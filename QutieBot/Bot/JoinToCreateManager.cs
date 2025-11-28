@@ -1,6 +1,7 @@
 ﻿using DSharpPlus;
 using DSharpPlus.Entities;
 using DSharpPlus.EventArgs;
+using Microsoft.EntityFrameworkCore.ChangeTracking.Internal;
 using Microsoft.Extensions.Logging;
 using QutieDAL.DAL;
 using QutieDTO.Models;
@@ -20,6 +21,7 @@ namespace QutieBot.Bot
     {
         // Configuration and state
         private List<ulong> _targetChannelIds = new List<ulong>();
+        private readonly StateManager _stateManager;
         private readonly Dictionary<ulong, List<ulong>> _createdChannels = new Dictionary<ulong, List<ulong>>();
 
         // Dependencies
@@ -33,10 +35,15 @@ namespace QutieBot.Bot
         /// <param name="logger">The logger instance</param>
         public JoinToCreateManager(
             JoinToCreateManagerDAL dal,
+            StateManager stateManager,
             ILogger<JoinToCreateManager> logger)
         {
             _dal = dal ?? throw new ArgumentNullException(nameof(dal));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _stateManager = stateManager;
+
+            // Load persisted state
+            _createdChannels = _stateManager.GetJtcCreatedChannels();
 
             _logger.LogInformation("JoinToCreateManager initialized");
 
@@ -164,6 +171,7 @@ namespace QutieBot.Bot
                             }
 
                             _createdChannels[targetChannelId].Add(newChannel.Id);
+                            _stateManager.AddJtcCreatedChannel(targetChannelId, newChannel.Id);
 
                             // Move the user to the new channel
                             await e.After.Member.PlaceInAsync(newChannel);
@@ -198,7 +206,20 @@ namespace QutieBot.Bot
                         _logger.LogInformation($"User {e.User.Id} left dynamic channel {e.Before.Channel.Id}");
 
                         // Try to delete the channel if it's now empty
-                        await DeleteEmptyDynamicChannel(e.Guild, e.Before.Channel);
+                        try
+                        {
+                            if (e.Before.Channel != null && e.Before.Channel.Users.Count == 0)
+                            {
+                                await e.Before.Channel.DeleteAsync();
+                                _createdChannels.Remove(e.Before.Channel.Id);
+                                _stateManager.RemoveJtcCreatedChannel(targetChannelId, e.Before.Channel.Id);
+                                _logger.LogInformation($"{e.Before.Channel.Name} Channel was empty and has been deleted");
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, "Error deleting empty join-to-create channel");
+                        }
 
                         // We only need to process one target channel per event
                         break;
@@ -277,28 +298,6 @@ namespace QutieBot.Bot
             {
                 _logger.LogError(ex, $"Error deleting join-to-create channel {channelId}");
                 return 2;
-            }
-        }
-
-        /// <summary>
-        /// Deletes a dynamic channel if it's empty
-        /// </summary>
-        /// <param name="guild">The Discord guild</param>
-        /// <param name="channel">The channel to check and potentially delete</param>
-        private async Task DeleteEmptyDynamicChannel(DiscordGuild guild, DiscordChannel channel)
-        {
-            try
-            {
-                if (channel != null && channel.Users.Count == 0)
-                {
-                    await channel.DeleteAsync();
-                    _createdChannels.Remove(channel.Id);
-                    _logger.LogInformation($"{channel.Name} Channel was empty and has been deleted");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting empty join-to-create channel");
             }
         }
     }
