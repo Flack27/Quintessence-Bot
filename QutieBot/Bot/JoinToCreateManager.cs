@@ -71,6 +71,50 @@ namespace QutieBot.Bot
             }
         }
 
+
+        /// <summary>
+        /// Validates that persisted created channels still exist on Discord
+        /// Call this after bot connects to clean up stale entries
+        /// </summary>
+        public async Task ValidateCreatedChannelsAsync(DiscordClient client)
+        {
+            try
+            {
+                var toRemove = new List<(ulong targetId, ulong createdId)>();
+
+                foreach (var (targetChannelId, createdChannelIds) in _createdChannels)
+                {
+                    foreach (var createdChannelId in createdChannelIds.ToList())
+                    {
+                        try
+                        {
+                            var channel = await client.GetChannelAsync(createdChannelId);
+                            if (channel == null)
+                            {
+                                toRemove.Add((targetChannelId, createdChannelId));
+                            }
+                        }
+                        catch
+                        {
+                            // Channel doesn't exist anymore
+                            toRemove.Add((targetChannelId, createdChannelId));
+                        }
+                    }
+                }
+
+                foreach (var (targetId, createdId) in toRemove)
+                {
+                    _createdChannels[targetId]?.Remove(createdId);
+                    _stateManager.RemoveJtcCreatedChannel(targetId, createdId);
+                    _logger.LogInformation($"Removed stale JTC channel {createdId} from tracking");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating created channels");
+            }
+        }
+
         /// <summary>
         /// Stores a new join-to-create channel in the database
         /// </summary>
