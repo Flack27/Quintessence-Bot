@@ -475,7 +475,7 @@ namespace QutieBot.Bot
         /// <summary>
         /// Checks if user has insufficient voice XP for a deposit
         /// </summary>
-        public async Task<bool> CheckUserVoiceDeposit(ulong userId, long amount)
+        public async Task<bool> CheckUserDeposit(ulong userId, long amount)
         {
             try
             {
@@ -567,20 +567,293 @@ namespace QutieBot.Bot
         }
 
         /// <summary>
-        /// Gets a user's current voice XP
+        /// Checks if a user has enough voice XP for a heist
         /// </summary>
-        public async Task<int> GetUserVoiceXP(ulong userId)
+        public async Task<bool> CheckHeistXP(ulong userId)
         {
             try
             {
                 var user = await _databaseManager.GetUserVoiceXP(userId);
-                return user?.VoiceXp ?? 0;
+                if (user == null || user.VoiceXp < 500)
+                {
+                    return true; // Insufficient funds
+                }
+                return false; // Has sufficient funds
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, $"Error checking heist voice XP for user {userId}");
+                return true; // Err on the side of caution
+            }
+        }
+
+        /// <summary>
+        /// Checks if users have enough voice XP for a steal attempt
+        /// </summary>
+        public async Task<bool> CheckUserXP(ulong thiefId, ulong targetId, long amount)
+        {
+            try
+            {
+                var thief = await _databaseManager.GetUserVoiceXP(thiefId);
+                var target = await _databaseManager.GetUserVoiceXP(targetId);
+
+                if (thief == null || thief.VoiceXp < amount / 2 || target == null || target.VoiceXp < amount)
+                {
+                    _logger.LogDebug($"Insufficient voice XP for steal: thief {thiefId} ({thief?.VoiceXp ?? 0}), target {targetId} ({target?.VoiceXp ?? 0}), amount {amount}");
+                    return true; // Insufficient funds
+                }
+
+                return false; // Has sufficient funds
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error checking voice XP for steal attempt");
+                return true; // Err on the side of caution
+            }
+        }
+
+        /// <summary>
+        /// Checks if a user has enough voice XP to donate
+        /// </summary>
+        public async Task<bool> CheckDonateXP(ulong userId)
+        {
+            try
+            {
+                var user = await _databaseManager.GetUserVoiceXP(userId);
+                if (user == null || user.VoiceXp < 1500)
+                {
+                    return true; // Insufficient funds
+                }
+                return false; // Has sufficient funds
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error checking donate voice XP for user {userId}");
+                return true; // Err on the side of caution
+            }
+        }
+
+        /// <summary>
+        /// Processes a donation and returns the karma increase
+        /// </summary>
+        public async Task<double> Donate(ulong userId)
+        {
+            try
+            {
+                var user = await _databaseManager.GetUserVoiceXP(userId);
+                var bank = await _databaseManager.GetUserVoiceXP(TAX_BANK_USER_ID);
+
+                user.VoiceXp -= 1500;
+                bank.VoiceXp += 1500;
+
+                double karmaIncrease;
+
+                if (user.Karma < 0.3)
+                {
+                    // Lower karma users get larger boosts (up to 0.6)
+                    karmaIncrease = 0.6 - (0.8 * user.Karma);
+                }
+                else if (user.Karma < 0.7)
+                {
+                    // Mid-range users get moderate boosts
+                    // This creates a smoother transition from 0.3 to 0.7
+                    karmaIncrease = 0.45 - (0.4 * user.Karma);
+                }
+                else if (user.Karma < 1.0)
+                {
+                    // Higher karma users get smaller but still useful boosts
+                    karmaIncrease = 0.2 - (0.15 * user.Karma);
+                }
+                else
+                {
+                    // Players at or above 1.0 get a small standard boost
+                    karmaIncrease = 0.03;
+                }
+
+                user.Karma += karmaIncrease;
+                if (user.Karma > 1.3)
+                {
+                    user.Karma = 1.3;
+                    karmaIncrease = 0;
+                }
+
+                _logger.LogInformation($"User {userId} donated 1500 voice XP and gained {karmaIncrease:F2} karma (new karma: {user.Karma:F2})");
+
+                await _databaseManager.SaveUserVoiceXP(user);
+                await _databaseManager.SaveUserVoiceXP(bank);
+
+                return karmaIncrease;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing voice donation for user {userId}");
                 _logger.LogError(ex, $"Error getting voice XP for user {userId}");
                 return 0;
             }
+        }
+
+
+        /// <summary>
+        /// Attempts to steal voice XP from another user
+        /// </summary>
+        public async Task<double> StealXP(long amount, DiscordUser thiefU, DiscordUser targetU, bool isProtected, DiscordUser protectU)
+        {
+            try
+            {
+                var thief = await _databaseManager.GetUserVoiceXP(thiefU.Id);
+                var target = await _databaseManager.GetUserVoiceXP(targetU.Id);
+                var successRate = _random.NextDouble();
+
+                double threshold = thief.Karma switch
+                {
+                    < 0.2 => 0.7,
+                    < 0.4 => 0.65,
+                    < 0.55 => 0.6,
+                    < 0.7 => 0.55,
+                    _ => 0.5
+                };
+
+                if (isProtected) threshold = 0.2;
+
+                bool stealSuccess = successRate <= threshold;
+                _logger.LogInformation($"Voice XP steal attempt: {thiefU.Username} trying to steal {amount} XP from {targetU.Username}. " +
+                                    $"Success rate: {successRate:F2}, Threshold: {threshold:F2}, Protected: {isProtected}, Success: {stealSuccess}");
+
+                if (stealSuccess)
+                {
+                    thief.VoiceXp += (int)amount;
+                    target.VoiceXp -= (int)amount;
+
+                    await _databaseManager.SaveUserVoiceXP(target);
+                    await CalculateLevelAndRequiredXP(thief, thiefU);
+                    return 0;
+                }
+                else
+                {
+                    if (isProtected == false)
+                    {
+                        _logger.LogDebug($"Failed voice steal: {thiefU.Username} lost 0.08 karma, new karma: {thief.Karma:F2}");
+
+                        var karmaReduction = 0.05;
+                        karmaReduction = CalculateKarma(thief, karmaReduction);
+
+                        await _databaseManager.SaveUserVoiceXP(thief);
+                        return karmaReduction;
+                    }
+                    else
+                    {
+                        var karmaReduction = 0.1;
+                        karmaReduction = CalculateKarma(thief, karmaReduction);
+
+                        var protector = await _databaseManager.GetUserVoiceXP(protectU.Id);
+
+                        thief.VoiceXp -= (int)amount / 2;
+                        target.VoiceXp += (int)amount / 2;
+
+                        protector.Karma += 0.1;
+
+                        if (protector.Karma > 1.3)
+                        {
+                            protector.Karma = 1.3;
+                        }
+
+                        _logger.LogDebug($"Protected voice steal failure: {thiefU.Username} lost {amount / 2} XP and 0.05 karma. " +
+                                       $"Protector {protectU.Username} gained 0.1 karma (now {protector.Karma:F2})");
+
+                        await _databaseManager.SaveUserVoiceXP(thief);
+                        await _databaseManager.SaveUserVoiceXP(protector);
+                        await CalculateLevelAndRequiredXP(target, targetU);
+
+                        return karmaReduction;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing voice steal attempt from {thiefU.Id} to {targetU.Id}");
+                return -1;
+            }
+        }
+
+
+        /// <summary>
+        /// Attempts a heist on the bank for voice XP
+        /// </summary>
+        public async Task<(int, double)> Heist(DiscordUser user)
+        {
+            try
+            {
+                var thief = await _databaseManager.GetUserVoiceXP(user.Id);
+                var bank = await _databaseManager.GetUserVoiceXP(TAX_BANK_USER_ID);
+                var successRate = _random.NextDouble();
+                var threshold = 0.01;
+
+                if (thief.Karma < 0.4)
+                {
+                    threshold = 0.015;
+                }
+                if (thief.Karma < 0.2)
+                {
+                    threshold = 0.02;
+                }
+
+                bool heistSuccess = successRate <= threshold;
+                _logger.LogInformation($"Voice heist attempt by {user.Username}: Rate {successRate:F4}, Threshold {threshold:F4}, Success: {heistSuccess}");
+
+                if (heistSuccess)
+                {
+                    var prize = bank.VoiceXp;
+                    thief.VoiceXp += bank.VoiceXp;
+                    bank.VoiceXp = 0;
+
+                    await _databaseManager.WipeBankData();
+                    await _databaseManager.SaveUserVoiceXP(bank);
+                    await CalculateLevelAndRequiredXP(thief, user);
+
+                    _logger.LogInformation($"Successful voice heist by {user.Username}! Stole {prize} XP from bank.");
+                    return (prize, 0);
+                }
+                else
+                {
+                    thief.VoiceXp -= 500;
+                    bank.VoiceXp += 500;
+                    double lostKarma = 0;
+                    if (thief.Karma >= 0.01)
+                    {
+                        lostKarma = thief.Karma / 2;
+                        thief.Karma -= lostKarma;
+                    }
+
+                    _logger.LogDebug($"Failed voice heist by {user.Username}. Lost 500 XP and karma reduced to {lostKarma:F2}");
+
+                    await _databaseManager.SaveUserVoiceXP(thief);
+                    await _databaseManager.SaveUserVoiceXP(bank);
+
+                    return (0, lostKarma);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error processing voice heist for user {user.Id}");
+                return (-1, -1);
+            }
+        }
+
+
+        private double CalculateKarma(UserData thief, double karmaReduction)
+        {
+            var initialKarma = thief.Karma;
+
+            thief.Karma -= karmaReduction;
+
+            // Ensure karma does not drop below 0.01
+            if (thief.Karma < 0.01)
+            {
+                karmaReduction = initialKarma - 0.01; // Adjust karma reduction to match the actual decrease
+                thief.Karma = 0.01;
+            }
+
+            return karmaReduction;
         }
     }
 }

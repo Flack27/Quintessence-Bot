@@ -261,6 +261,7 @@ namespace QutieBot.Bot
 
                 _stateManager.UpdateActiveInterview(userId, new InterviewDataState
                 {
+                    UserId = userId,
                     ChannelId = interviewChannel.Id,
                     SubmissionId = submissionId,
                     CreatedAt = interviewData.CreatedAt
