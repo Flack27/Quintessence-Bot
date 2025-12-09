@@ -234,7 +234,7 @@ namespace QutieDAL.DAL
                     if (user.InGuild != null) existingUser.InGuild = user.InGuild;
 
                     // Update roles if provided
-                    if (user.Roles != null && user.Roles.Any())
+                    if (user.Roles != null)
                     {
                         var existingRoleIds = existingUser.Roles.Select(r => r.RoleId).ToHashSet();
                         var newRoleIds = user.Roles.Select(r => r.RoleId).ToHashSet();
